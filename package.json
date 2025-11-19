@@ -1,18 +1,30 @@
 {
   "name": "coinmate-dca-bot",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "version": "2.0.0",
+  "description": "Smart DCA Bot pro Coinmate (Open Source)",
+  "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node app.js",
+    "background": "pm2 start app.js --name coinmate-bot",
+    "stop": "pm2 stop coinmate-bot",
+    "restart": "pm2 restart coinmate-bot",
+    "logs": "pm2 logs coinmate-bot",
+    "monitor": "pm2 monit"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "coinmate",
+    "crypto",
+    "dca",
+    "bot",
+    "bitcoin"
+  ],
+  "author": "Marek Jungwirth",
   "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
     "crypto-js": "^4.2.0",
     "node-fetch": "^2.7.0",
-    "node-schedule": "^2.1.1"
+    "node-schedule": "^2.1.1",
+    "pm2": "^5.3.0"
   }
 }
+

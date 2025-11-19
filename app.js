@@ -1,3 +1,24 @@
+// --- 1. SAMOKONTROLA CONFIGU (Seamless Experience) ---
+const configPath = path.resolve(__dirname, 'config.js');
+const examplePath = path.resolve(__dirname, 'config.example.js');
+
+if (!fs.existsSync(configPath)) {
+  if (fs.existsSync(examplePath)) {
+    // Automaticky vytvoříme config.js z example
+    fs.copyFileSync(examplePath, configPath);
+    console.log('\n==================================================');
+    console.log('⚠️  PRVNÍ SPUŠTĚNÍ DETEKOVÁNO');
+    console.log('✅  Vytvořil jsem pro tebe soubor "config.js".');
+    console.log('👉  Jdi do složky, otevři "config.js" a vyplň své API klíče.');
+    console.log('👉  Pak spusť bota znovu.');
+    console.log('==================================================\n');
+    process.exit(0); // Ukončíme program, aby uživatel mohl editovat
+  } else {
+    console.error('CHYBA: Nenalezen ani config.js, ani config.example.js!');
+    process.exit(1);
+  }
+}
+
 const schedule = require('node-schedule');
 const config = require('./config');
 const { runBuy, runCheck } = require('./logic');
