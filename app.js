@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path'); // <--- TENTO ŘÁDEK TAM CHYBĚL!
+
 // --- 1. SAMOKONTROLA CONFIGU (Seamless Experience) ---
 const configPath = path.resolve(__dirname, 'config.js');
 const examplePath = path.resolve(__dirname, 'config.example.js');
