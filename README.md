@@ -1,73 +1,52 @@
-# Coinmate DCA Bot 🤖
+# 🤖 Coinmate DCA Bot (Multi-Strategy Edition)
 
-Chytrý a bezúdržbový bot pro pravidelné nákupy (DCA) na burze Coinmate.
+Automatizovaný bot pro nákup kryptoměn na české burze Coinmate.io.
+Podporuje "Smart DCA" – snaží se nakupovat v lokálních dipech pod 3-denním průměrem.
 
 ## ✨ Funkce
-* **Smart DCA:** Nakupuje v nastavený den (např. Pondělí ráno).
-* **Dip Catcher:** Snaží se chytit propad ceny (-2% pod průměrem).
-* **Auto-Complete:** Pokud limitní příkaz neprojde, bot zbytek týdne dokoupí za tržní cenu (Market Buy), takže o investici nepřijdeš.
-* **Univerzální:** Funguje pro libovolný pár (BTC_CZK, SOL_CZK, XRP_EUR...).
-* **Bezpečný:** API klíče jsou oddělené v `config.js` (ignorováno Gitem).
-* **Seamless:** Automatická instalace a běh na pozadí.
+- **Smart DCA:** Vypočítá průměrnou cenu za 3 dny a nastaví limitní příkaz o 2 % níže.
+- **Auto-Fallout:** Pokud se limitka do konce cyklu nevyplní, bot ji zruší a koupí za tržní cenu (Market Buy), aby ti neutekl nákup.
+- **Multi-Strategy:** Můžeš nakupovat více měn najednou s různým nastavením (např. SOL týdně + BTC měsíčně).
+- **Flexibilita:** Nastav si denní, týdenní nebo měsíční intervaly.
 
-## 🚀 Instalace a Spuštění
+## 🛠 Instalace
 
-Bot je navržen tak, aby fungoval "out of the box" bez složitého nastavování serveru.
+1. **Naklonuj repozitář:**
+   ```bash
+   git clone [https://github.com/tvoje-jmeno/coinmate-dca-bot.git](https://github.com/tvoje-jmeno/coinmate-dca-bot.git)
+   cd coinmate-dca-bot
+   npm install
+   ```
 
-### 1. Stáhni a nainstaluj
-```bash
-git clone [https://github.com/marekjungwirth/coinmate-dca-bot.git](https://github.com/marekjungwirth/coinmate-dca-bot.git)
-cd coinmate-dca-bot
-npm install
-```
+2. **Nastav Config:**
+   Při prvním spuštění ti bot sám vytvoří konfigurační soubor:
+   ```bash
+   node app.js
+   ```
+   
+   Nyní otevři nově vzniklý `config.js`:
+   - Zadej své **API klíče** (Coinmate -> Settings -> API).
+   - V poli `STRATEGIES` odkomentuj nebo přidej blok pro měnu, kterou chceš.
 
-### 2. První spuštění (Generování configu)
-Spusť bota, aby si vytvořil konfigurační soubor:
-```bash
-npm start
-```
-*Bot detekuje první spuštění, automaticky vytvoří soubor `config.js` a ukončí se.*
+   *Příklad nastavení v config.js:*
+   ```javascript
+   {
+     label: 'Solana Weekly',
+     pair: 'SOL_CZK',
+     amount: 125,
+     frequency: 'weekly',
+     runDay: 1, // Pondělí
+     runHour: 10
+   }
+   ```
 
-### 3. Nastavení
-Otevři nově vytvořený soubor `config.js` v textovém editoru a vyplň:
+3. **Spusť bota:**
+   Pro běh na pozadí (pomocí PM2):
+   ```bash
+   npm run background
+   ```
 
-**Povinné:**
-* **API Klíče** (Client ID, Public Key, Private Key)
-* **PAIR** (např. 'BTC_CZK' nebo 'SOL_CZK')
-* **INVESTMENT_AMOUNT** (kolik chceš pravidelně investovat)
-
-**Volitelné (Strategie):**
-* **DIP_PERCENTAGE**: O kolik % pod průměrem nakupovat (default: 0.02 = 2%).
-* **DAYS_AVERAGE**: Z kolika dní počítat průměrnou cenu (default: 3 dny).
-* **BUY_DAY / HOUR**: Kdy má bot nakupovat.
-
-### 4. Ostré spuštění na pozadí
-Jakmile máš nastaveno, spusť bota do "neviditelného" režimu:
-```bash
-npm run background
-```
-*Bot nyní běží na pozadí (pomocí PM2), přežije i zavření terminálu a bude tiše pracovat.*
-
----
-
-## 🛠 Ovládání bota
-
-* **Kontrola stavu (běží?):**
-  ```bash
-  npm run monitor
-  ```
-* **Zobrazení logů (co dělá?):**
-  ```bash
-  npm run logs
-  ```
-* **Zastavení bota:**
-  ```bash
-  npm stop
-  ```
-* **Restartování (po změně configu):**
-  ```bash
-  npm restart
-  ```
-
-## 📄 Licence
-Open Source (ISC)
+## 📊 Správa bota
+- **Sledování logů:** `pm2 logs coinmate-bot`
+- **Restart (po úpravě configu):** `pm2 restart coinmate-bot`
+- **Zastavení:** `pm2 stop coinmate-bot`

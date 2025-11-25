@@ -1,26 +1,52 @@
-module.exports = {
-  // --- 1. PŘIHLAŠOVACÍ ÚDAJE ---
-  COINMATE: {
-    clientId: 'TVOJE_CLIENT_ID',
-    publicKey: 'TVOJE_PUBLIC_KEY',
-    privateKey: 'TVOJE_PRIVATE_KEY'
-  },
+// ============================================================
+// 🛠️  COINMATE DCA BOT - KONFIGURACE (VZOR)
+// ============================================================
 
-  // --- 2. NASTAVENÍ OBCHODU ---
-  PAIR: 'SOL_CZK',          // Pár (např. BTC_CZK, ETH_EUR, SOL_CZK)
-  INVESTMENT_AMOUNT: 125,   // Kolik investovat (v měně nákupu, např. CZK)
-  
-  // --- 3. NASTAVENÍ ČASU ---
-  BUY_DAY: 1,      // 1 = Pondělí
-  BUY_HOUR: 8,     // 8:00
-  
-  CHECK_DAY: 0,    // 0 = Neděle
-  CHECK_HOUR: 23,  // 23:55
-
-  // --- 4. POKROČILÉ ---
-  DIP_PERCENTAGE: 0.02, // 2%
-  DAYS_AVERAGE: 3,
-  STATE_FILE: './bot_state.json',
-  LOG_FILE: './bot.log'
+// 1. 🔐 API KLÍČE (Coinmate -> Settings -> API)
+const COINMATE = {
+  clientId: 'TVOJE_CLIENT_ID',
+  publicKey: 'TVOJE_PUBLIC_KEY',
+  privateKey: 'TVOJE_PRIVATE_KEY'
 };
 
+// 2. ⚙️  TECHNICKÁ NASTAVENÍ
+const STATE_FILE = './bot_state.json';
+const LOG_FILE = './bot.log';
+const DIP_PERCENTAGE = 0.02; // 2% sleva pro limitku
+const DAYS_AVERAGE = 3;      // Průměr za 3 dny
+
+// 3. 🚀 STRATEGIE
+const STRATEGIES = [
+  // Odkomentuj a uprav si, co chceš používat:
+
+  /*
+  {
+    label: 'Solana Weekly',
+    pair: 'SOL_CZK',
+    amount: 100,
+    frequency: 'weekly',
+    runDay: 1, // Pondělí
+    runHour: 10
+  },
+  */
+  
+  /*
+  {
+    label: 'Bitcoin Monthly',
+    pair: 'BTC_CZK',
+    amount: 1000,
+    frequency: 'monthly',
+    runDay: 15, // 15. den v měsíci
+    runHour: 20
+  }
+  */
+];
+
+module.exports = {
+  COINMATE,
+  STATE_FILE,
+  LOG_FILE,
+  DIP_PERCENTAGE,
+  DAYS_AVERAGE,
+  STRATEGIES
+};
