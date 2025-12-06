@@ -4,3 +4,37 @@
 [2025-11-19T12:43:22.884Z] [SOL_CZK] API Error (balances): Access denied.
 [2025-11-19T17:40:12.297Z] [SOL_CZK] ✅ Bot běží na pozadí.
 [2025-11-19T17:40:41.122Z] [SOL_CZK] ✅ Bot běží na pozadí.
+[2025-12-06T14:18:55.383Z] [SYSTEM] 🤖 Restartuji plánovač a načítám strategie...
+[2025-12-06T14:18:55.423Z] [SYSTEM] ✅ Naplánováno: SOL_CZK (weekly)
+[2025-12-06T14:24:58.680Z] [SYSTEM] 🤖 Restartuji plánovač a načítám strategie...
+[2025-12-06T14:24:58.724Z] [SYSTEM] ✅ Naplánováno: SOL_CZK (weekly)
+[2025-12-06T14:29:27.791Z] [SYSTEM] 🤖 Restartuji plánovač a načítám strategie...
+[2025-12-06T14:29:27.827Z] [SYSTEM] ✅ Naplánováno: SOL_CZK (weekly)
+[2025-12-06T14:33:26.074Z] [SYSTEM] 🤖 Restartuji plánovač a načítám strategie...
+[2025-12-06T14:33:26.116Z] [SYSTEM] ✅ Naplánováno: SOL_CZK (weekly)
+[2025-12-06T14:38:33.883Z] [SYSTEM] 🤖 Restartuji plánovač a načítám strategie...
+[2025-12-06T14:38:33.926Z] [SYSTEM] ✅ Naplánováno: SOL_CZK (weekly)
+[2025-12-06T14:53:53.121Z] [SYSTEM] 🤖 Restartuji plánovač a načítám strategie...
+[2025-12-06T14:53:53.154Z] [SYSTEM] ✅ Naplánováno: SOL_CZK (weekly)
+[2025-12-06T14:55:06.424Z] [WEB] 📝 Config aktualizován přes Web UI
+[2025-12-06T14:55:06.427Z] [SYSTEM] Žádné strategie k naplánování.
+[2025-12-06T14:55:10.643Z] [WEB] 📝 Config aktualizován přes Web UI
+[2025-12-06T14:55:10.643Z] [SYSTEM] Žádné strategie k naplánování.
+[2025-12-06T15:04:56.481Z] [SYSTEM] Žádné strategie k naplánování.
+[2025-12-06T15:05:01.137Z] [ERROR] API Error (balances): Access denied.
+[2025-12-06T15:05:04.012Z] [ERROR] API Error (balances): Access denied.
+[2025-12-06T15:05:28.705Z] [ERROR] API Error (balances): Access denied.
+[2025-12-06T15:05:29.718Z] [ERROR] API Error (balances): Access denied.
+[2025-12-06T15:09:59.149Z] [SYSTEM] Žádné strategie k naplánování.
+[2025-12-06T15:10:03.871Z] [ERROR] API Error (balances): Access denied.
+[2025-12-06T15:10:05.651Z] [ERROR] API Error (balances): Access denied.
+[2025-12-06T15:11:05.711Z] [ERROR] API Error (balances): Access denied.
+[2025-12-06T15:11:42.865Z] [WEB] 📝 Config aktualizován přes Web UI
+[2025-12-06T15:11:42.866Z] [SYSTEM] Žádné strategie k naplánování.
+[2025-12-06T15:11:46.794Z] [ERROR] API Error (balances): Access denied.
+[2025-12-06T15:12:04.104Z] [SYSTEM] Žádné strategie k naplánování.
+[2025-12-06T15:12:08.180Z] [ERROR] API Error (balances): Access denied.
+[2025-12-06T15:15:31.897Z] [SYSTEM] Žádné strategie k naplánování.
+[2025-12-06T15:15:38.550Z] [ERROR] API Error (balances): Access denied.
+[2025-12-06T15:15:38.999Z] [ERROR] API Error (balances): Access denied.
+[2025-12-06T15:23:06.333Z] [SYSTEM] Žádné strategie k naplánování.

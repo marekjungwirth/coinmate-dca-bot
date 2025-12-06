@@ -1,5 +1,7 @@
 node_modules/
-config.js
+.DS_Store
+.env
+data/
+bot.log
 bot_state.json
 *.log
-.DS_Store

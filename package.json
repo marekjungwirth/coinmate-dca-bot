@@ -21,10 +21,12 @@
   "author": "Marek Jungwirth",
   "license": "ISC",
   "dependencies": {
+    "body-parser": "^2.2.1",
+    "cors": "^2.8.5",
     "crypto-js": "^4.2.0",
+    "express": "^5.2.1",
     "node-fetch": "^2.7.0",
     "node-schedule": "^2.1.1",
     "pm2": "latest"
   }
 }
-
