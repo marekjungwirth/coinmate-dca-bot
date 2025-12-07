@@ -18,17 +18,18 @@ Bot má vlastní **Webový Dashboard**, kde si vše jednoduše naklikáte. Žád
 Pro spuštění potřebujete pouze **Docker**. Pokud máte NAS (Synology, QNAP, Asustor) nebo Linux server, máte vyhráno.
 
 ### 1. Stažení
-Naklonujte si repozitář nebo stáhněte soubory:
+Naklonujte si repozitář:
 ```bash
-git clone [https://github.com/tvoje-jmeno/coinmate-dca-bot.git](https://github.com/tvoje-jmeno/coinmate-dca-bot.git)
+git clone [https://github.com/marekjungwirth/coinmate-dca-bot.git](https://github.com/marekjungwirth/coinmate-dca-bot.git)
 cd coinmate-dca-bot
 ```
 
 ### 2. Spuštění
 Spusťte bota na pozadí:
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
+*(Pokud příkaz `docker compose` nefunguje, zkuste starší variantu `docker-compose up -d`)*
 
 ### 3. Hotovo! 🎉
 Otevřete prohlížeč a jděte na:
@@ -36,22 +37,25 @@ Otevřete prohlížeč a jděte na:
 
 *(Např. http://192.168.1.50:8080 nebo http://localhost:8080)*
 
+> **Tip:** Pokud port 8080 už používáte, otevřete soubor `docker-compose.yml` a změňte `"8080:3000"` například na `"8085:3000"`.
+
 ---
 
 ## ⚙️ Jak to nastavit?
 
-1.  Otevřete Webový Dashboard.
+1.  Otevřete Webový Dashboard (uvidíte prázdná pole).
 2.  V sekci **API Klíče** zadejte své údaje z Coinmate (Settings -> API).
     * *Potřebná práva:* `Order book`, `Place limit/market orders`, `Balances`.
-3.  V sekci **Strategie** klikněte na **+ Přidat Strategii**.
+3.  Klikněte na **💾 Uložit Změny**. Bot se restartuje a načte vaše portfolio.
+4.  V sekci **Strategie** klikněte na **+ Přidat Strategii**.
     * Vyberte měnu (např. BTC), frekvenci (Týdně) a částku.
-4.  Klikněte na **💾 Uložit Změny & Spustit**.
+5.  Uložte a máte hotovo! ✅
 
 Bot nyní běží na pozadí, hlídá čas a nakupuje za vás.
 
 ---
 
-## 🛠️ Pro pokročilé (Manuální instalace)
+## 🛠️ Pro pokročilé (Manuální instalace bez Dockeru)
 
 Pokud nechcete Docker, potřebujete Node.js v18+.
 
@@ -64,7 +68,7 @@ Web poběží na `http://localhost:3000`.
 ---
 
 ## 🔒 Bezpečnost
-* API klíče jsou uloženy **pouze u vás** v souboru `data/config.json`.
+* API klíče jsou uloženy **pouze u vás** v lokálním souboru `data/config.json`.
 * Nikam se neposílají. Aplikace komunikuje přímo s Coinmate API.
 
 ---
