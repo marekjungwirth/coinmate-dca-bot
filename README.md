@@ -20,7 +20,7 @@ Pro spuštění potřebujete pouze **Docker**. Pokud máte NAS (Synology, QNAP, 
 ### 1. Stažení
 Naklonujte si repozitář:
 ```bash
-git clone [https://github.com/marekjungwirth/coinmate-dca-bot.git](https://github.com/marekjungwirth/coinmate-dca-bot.git)
+git clone https://github.com/marekjungwirth/coinmate-dca-bot.git
 cd coinmate-dca-bot
 ```
 
