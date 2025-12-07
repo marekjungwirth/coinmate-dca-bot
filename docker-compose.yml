@@ -1,0 +1,12 @@
+services:
+  coinmate-bot:
+    build: .
+    container_name: coinmate-bot
+    restart: unless-stopped
+    ports:
+      - "8080:3000"
+    volumes:
+      - ./data:/app/data
+      - ./bot_logs:/app/logs
+    environment:
+      - TZ=Europe/Prague
