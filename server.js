@@ -19,6 +19,11 @@ const COIN_MAPPING = {
   'LTC': 'litecoin', 'XRP': 'ripple', 'ADA': 'cardano' 
 };
 
+const COIN_COLORS = { 
+  'BTC': '#f7931a', 'ETH': '#627eea', 'SOL': '#9945FF', 
+  'LTC': '#345d9d', 'XRP': '#00aae4', 'ADA': '#0033ad' 
+};
+
 let scheduledJobs = [];
 
 function startBot() {
@@ -44,8 +49,16 @@ function startBot() {
     const [crypto, fiat] = strat.pair.split('_');
     const coinGeckoId = COIN_MAPPING[crypto];
 
+    // Sestavení aktivní strategie - dipPercentage se bere přímo z objektu strategie
     const activeStrat = {
-      ...strat, coinGeckoId, fiat, minOrder: (fiat === 'EUR' ? 2 : 50)
+      ...strat, 
+      coinGeckoId, 
+      fiat, 
+      minOrder: (fiat === 'EUR' ? 2 : 50),
+      settings: {
+          daysAverage: config.settings?.daysAverage || 3,
+          dipPercentage: strat.dipPercentage // Individuální hodnota pro každou kartu
+      }
     };
 
     const buyRule = new schedule.RecurrenceRule();
@@ -53,16 +66,15 @@ function startBot() {
 
     buyRule.hour = strat.runHour; buyRule.minute = 0;
     checkRule.hour = strat.runHour; checkRule.minute = 55;
-    checkRule.dayOfWeek = new schedule.Range(0, 6);
 
     if (strat.frequency === 'weekly') buyRule.dayOfWeek = strat.runDay;
     else if (strat.frequency === 'monthly') buyRule.date = strat.runDay;
-    else if (strat.frequency === 'daily') buyRule.dayOfWeek = new schedule.Range(0, 6);
+    else buyRule.dayOfWeek = new schedule.Range(0, 6); // Daily
 
     scheduledJobs.push(schedule.scheduleJob(buyRule, () => runBuy(activeStrat)));
     scheduledJobs.push(schedule.scheduleJob(checkRule, () => runCheck(activeStrat)));
     
-    logMessage(`✅ Scheduled: ${strat.pair} (${strat.frequency})`, "SYSTEM");
+    logMessage(`✅ Scheduled: ${strat.pair} (Dip: ${(strat.dipPercentage*100).toFixed(1)}%)`, "SYSTEM");
   });
   return true;
 }
@@ -72,7 +84,7 @@ function stopBot() {
   scheduledJobs = [];
 }
 
-// --- API ENDPOINTS ---
+// --- API ---
 
 app.get('/api/config', (req, res) => {
   if (!fs.existsSync(CONFIG_PATH)) return res.json({ error: "Config not found" });
@@ -84,7 +96,7 @@ app.post('/api/config', (req, res) => {
     fs.writeFileSync(CONFIG_PATH, JSON.stringify(req.body, null, 2));
     logMessage('Configuration updated via Web UI', "WEB");
     startBot();
-    res.json({ success: true, message: "Settings saved & Bot restarted!" });
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -92,76 +104,59 @@ app.post('/api/config', (req, res) => {
 
 app.post('/api/restart', (req, res) => {
   startBot();
-  res.json({ success: true, message: "Bot restarted." });
+  res.json({ success: true });
 });
 
 app.get('/api/logs', (req, res) => {
   const logPath = path.join(__dirname, 'bot.log');
-  if (fs.existsSync(logPath)) {
-    res.send(fs.readFileSync(logPath, 'utf8').trim().split('\n').slice(-100).join('\n'));
-  } else { res.send("No logs available."); }
+  if (fs.existsSync(logPath)) res.send(fs.readFileSync(logPath, 'utf8').trim().split('\n').slice(-100).join('\n'));
+  else res.send("No logs available.");
+});
+
+app.get('/api/stats', (req, res) => {
+    const range = req.query.range || 'all';
+    const history = getHistory();
+    if (history.length === 0) return res.json({ labels: [], datasets: [] });
+
+    const sortedHistory = [...history].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const labels = [...new Set(sortedHistory.map(t => t.date.split('T')[0]))];
+    const coins = [...new Set(history.map(t => t.pair.split('_')[0]))];
+    
+    const datasets = coins.map(coin => {
+        let cum = 0;
+        const data = labels.map(date => {
+            sortedHistory.filter(t => t.date.startsWith(date) && t.pair.startsWith(coin)).forEach(t => cum += Number(t.amountCrypto));
+            return cum;
+        });
+        return { label: coin, data: data, backgroundColor: COIN_COLORS[coin] || '#888', borderColor: COIN_COLORS[coin], fill: true, tension: 0.4 };
+    });
+    res.json({ labels, datasets });
 });
 
 app.get('/api/portfolio', async (req, res) => {
-    const targetCurrency = req.query.currency ? req.query.currency.toLowerCase() : 'czk'; 
+    const target = (req.query.currency || 'czk').toLowerCase(); 
     const history = getHistory();
-    
-    let botStats = { invested: 0, saved: 0, tradeCount: 0 };
-    history.forEach(trade => {
-        botStats.tradeCount++;
-        botStats.invested += Number(trade.amountFiat);
-        botStats.saved += Number(trade.savings || 0);
-    });
+    let botStats = { invested: 0, saved: 0, tradeCount: history.length };
+    history.forEach(t => { botStats.invested += Number(t.amountFiat); botStats.saved += Number(t.savings || 0); });
 
-    let realHoldings = {};
+    const balances = await coinmateApiCall('balances');
     let totalValue = 0;
-    const balancesData = await coinmateApiCall('balances');
-
-    if (balancesData) {
-        let geckoIdsToFetch = [];
-        let symbolToId = {};
-
-        for (const [symbol, data] of Object.entries(balancesData)) {
-            const amount = Number(data.balance);
-            if (amount > 0) {
-                if (COIN_MAPPING[symbol]) {
-                    const geckoId = COIN_MAPPING[symbol];
-                    geckoIdsToFetch.push(geckoId);
-                    symbolToId[geckoId] = symbol;
-                    realHoldings[symbol] = amount;
-                } else if (symbol === 'CZK' || symbol === 'EUR') {
-                    realHoldings[symbol] = amount;
-                    if (symbol.toLowerCase() === targetCurrency) {
-                        totalValue += amount;
-                    } else if (symbol === 'CZK' && targetCurrency === 'eur') {
-                        totalValue += amount / 25; 
-                    } else if (symbol === 'EUR' && targetCurrency === 'czk') {
-                        totalValue += amount * 25;
-                    }
-                }
+    if (balances) {
+        let ids = []; let symToId = {};
+        for (const [sym, d] of Object.entries(balances)) {
+            const amt = Number(d.balance);
+            if (amt > 0) {
+                if (COIN_MAPPING[sym]) { ids.push(COIN_MAPPING[sym]); symToId[COIN_MAPPING[sym]] = sym; }
+                else if (sym === 'CZK' && target === 'czk') totalValue += amt;
+                else if (sym === 'EUR' && target === 'eur') totalValue += amt;
             }
         }
-
-        if (geckoIdsToFetch.length > 0) {
-            const currentPrices = await getCurrentPrices(geckoIdsToFetch, targetCurrency);
-            for (const [geckoId, priceData] of Object.entries(currentPrices)) {
-                const symbol = symbolToId[geckoId];
-                const amount = realHoldings[symbol];
-                const price = priceData[targetCurrency];
-                if (price && amount) totalValue += amount * price;
-            }
+        if (ids.length > 0) {
+            const prices = await getCurrentPrices(ids, target);
+            for (const [id, p] of Object.entries(prices)) totalValue += (Number(balances[symToId[id]].balance) * p[target]);
         }
     }
-
-    res.json({
-        botStats,      
-        realHoldings, 
-        totalValue,    
-        currency: targetCurrency.toUpperCase()
-    });
+    res.json({ botStats, totalValue, currency: target.toUpperCase() });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 WEB DASHBOARD: http://localhost:${PORT}`);
-  startBot();
-});
+app.listen(PORT, () => { console.log(`🚀 DASHBOARD: http://localhost:${PORT}`); startBot(); });
