@@ -113,22 +113,54 @@ app.get('/api/logs', (req, res) => {
   else res.send("No logs available.");
 });
 
+// Upravit endpoint /api/stats v server.js
+
 app.get('/api/stats', (req, res) => {
     const range = req.query.range || 'all';
     const history = getHistory();
     if (history.length === 0) return res.json({ labels: [], datasets: [] });
 
+    // Seřadit historii
     const sortedHistory = [...history].sort((a, b) => new Date(a.date) - new Date(b.date));
-    const labels = [...new Set(sortedHistory.map(t => t.date.split('T')[0]))];
+
+    // Časový filtr
+    const now = new Date();
+    let cutoff = new Date(0);
+    if (range === '7d') cutoff = new Date(now.setDate(now.getDate() - 7));
+    else if (range === '30d') cutoff = new Date(now.setDate(now.getDate() - 30));
+    else if (range === '1y') cutoff = new Date(now.setFullYear(now.getFullYear() - 1));
+
+    // Vygenerovat unikátní dny pro osu X (jen od cutoff)
+    const labels = [...new Set(sortedHistory
+        .filter(t => new Date(t.date) >= cutoff)
+        .map(t => t.date.split('T')[0]))];
+
     const coins = [...new Set(history.map(t => t.pair.split('_')[0]))];
     
     const datasets = coins.map(coin => {
-        let cum = 0;
+        let runningTotal = 0;
+        
+        // Vypočítat počáteční stav před cutoff (aby graf nezačínal od nuly, pokud už jsi nakupoval dřív)
+        sortedHistory
+            .filter(t => t.pair.startsWith(coin) && new Date(t.date) < cutoff)
+            .forEach(t => runningTotal += Number(t.amountCrypto));
+
         const data = labels.map(date => {
-            sortedHistory.filter(t => t.date.startsWith(date) && t.pair.startsWith(coin)).forEach(t => cum += Number(t.amountCrypto));
-            return cum;
+            // Přičíst nákupy v daný den
+            sortedHistory
+                .filter(t => t.date.startsWith(date) && t.pair.startsWith(coin))
+                .forEach(t => runningTotal += Number(t.amountCrypto));
+            return runningTotal;
         });
-        return { label: coin, data: data, backgroundColor: COIN_COLORS[coin] || '#888', borderColor: COIN_COLORS[coin], fill: true, tension: 0.4 };
+
+        return { 
+            label: coin, 
+            data: data, 
+            backgroundColor: COIN_COLORS[coin] || '#888', 
+            borderColor: COIN_COLORS[coin], 
+            fill: true, 
+            tension: 0.2 // Méně agresivní křivka pro "ostřejší" schody nákupů
+        };
     });
     res.json({ labels, datasets });
 });
