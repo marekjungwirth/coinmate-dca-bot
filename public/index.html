@@ -20,7 +20,7 @@
         .mt-3 { margin-top: 15px; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
         .brand { font-size: 1.5rem; font-weight: 700; color: var(--primary); display: flex; align-items: center; gap: 10px; }
-        .card { background: var(--card-bg); border-radius: 12px; padding: 25px; border: 1px solid var(--border); margin-bottom: 20px; }
+        .card { background: var(--card-bg); border-radius: 12px; padding: 25px; border: 1px solid var(--border); margin-bottom: 20px; position: relative; }
         .section-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
         .stat-box { background: var(--input-bg); border: 1px solid var(--border); padding: 15px; border-radius: 8px; text-align: center; }
@@ -33,8 +33,9 @@
         label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; display: block; }
         .form-text { font-size: 0.7rem; color: var(--text-muted); margin-top: 4px; line-height: 1.3; }
         .strategies-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
-        .strategy-card { border-radius: 12px; border: 1px solid var(--border); border-top: 5px solid var(--strat-color); padding: 20px; background: var(--card-bg); position: relative; }
-        .btn-delete { position: absolute; top: 20px; right: 20px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem; z-index: 10; }
+        .strategy-card { border-radius: 12px; border: 1px solid var(--border); border-top: 5px solid var(--strat-color); padding: 35px 20px 20px 20px; background: var(--card-bg); position: relative; }
+        .btn-delete { position: absolute; top: 12px; right: 12px; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.3rem; z-index: 10; opacity: 0.6; transition: 0.2s; }
+        .btn-delete:hover { color: var(--danger); opacity: 1; transform: scale(1.1); }
         .card.collapsible.collapsed .card-content { display: none; }
         .card-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
         .chevron { transition: transform 0.3s; }
@@ -82,7 +83,6 @@
                 <div class="col"><label>Public Key</label><input type="text" id="publicKey"></div>
                 <div class="col"><label>Private Key</label><input type="password" id="privateKey"></div>
             </div>
-            <div class="form-text">Klíče jsou uloženy lokálně na vašem zařízení.</div>
         </div>
     </div>
 
@@ -129,14 +129,12 @@
         try {
             const res = await fetch('/api/config');
             const data = await res.json();
-            
             if(data.api) {
                 document.getElementById('clientId').value = data.api.clientId || '';
                 document.getElementById('publicKey').value = data.api.publicKey || '';
                 document.getElementById('privateKey').value = data.api.privateKey || '';
                 if (data.api.clientId) toggleApiSection(true);
             }
-
             strategies = data.strategies || [];
             currentSettings = data.settings || { daysAverage: 3 };
             renderStrategies();
@@ -154,7 +152,6 @@
         try {
             document.querySelectorAll('.input-group .btn-outline').forEach(b => b.classList.remove('active'));
             if(document.getElementById(`btn-${range}`)) document.getElementById(`btn-${range}`).classList.add('active');
-
             const res = await fetch(`/api/stats?range=${range}`);
             const data = await res.json();
             const ctx = document.getElementById('portfolioChart').getContext('2d');
@@ -176,17 +173,20 @@
             card.className = 'strategy-card';
             card.style.setProperty('--strat-color', COIN_COLORS[currCrypto] || '#888');
             
+            const timeHint = `<div class="form-text">Např. 14 = 14:00.</div>`;
             let timeControls = '';
+            
             if (strat.frequency === 'daily') {
-                timeControls = `<div class="mt-3"><label>Hodina (24h formát)</label><input type="number" min="0" max="23" value="${strat.runHour}" onchange="strategies[${index}].runHour=Number(this.value)"><div class="form-text">Např. 14 = 14:00.</div></div>`;
+                timeControls = `<div class="mt-3"><label>Hodina (24h formát)</label><input type="number" min="0" max="23" value="${strat.runHour}" onchange="strategies[${index}].runHour=Number(this.value)">${timeHint}</div>`;
             } else if (strat.frequency === 'weekly') {
-                timeControls = `<div class="row mt-3"><div class="col"><label>Den v týdnu</label><select onchange="strategies[${index}].runDay=Number(this.value)">${WEEK_DAYS.map(d => `<option value="${d.v}" ${strat.runDay===d.v?'selected':''}>${d.n}</option>`).join('')}</select></div><div class="col"><label>Hodina</label><input type="number" min="0" max="23" value="${strat.runHour}" onchange="strategies[${index}].runHour=Number(this.value)"></div></div>`;
+                timeControls = `<div class="row mt-3"><div class="col"><label>Den v týdnu</label><select onchange="strategies[${index}].runDay=Number(this.value)">${WEEK_DAYS.map(d => `<option value="${d.v}" ${strat.runDay===d.v?'selected':''}>${d.n}</option>`).join('')}</select></div><div class="col"><label>Hodina</label><input type="number" min="0" max="23" value="${strat.runHour}" onchange="strategies[${index}].runHour=Number(this.value)"></div></div>${timeHint}`;
             } else if (strat.frequency === 'monthly') {
-                timeControls = `<div class="row mt-3"><div class="col"><label>Den v měsíci</label><input type="number" min="1" max="28" value="${strat.runDay}" onchange="strategies[${index}].runDay=Number(this.value)"><div class="form-text">Např. 14 = 14. den.</div></div><div class="col"><label>Hodina</label><input type="number" min="0" max="23" value="${strat.runHour}" onchange="strategies[${index}].runHour=Number(this.value)"></div></div><div class="form-text">Doporučeno max 28. den.</div>`;
+                timeControls = `<div class="row mt-3"><div class="col"><label>Den v měsíci</label><input type="number" min="1" max="28" value="${strat.runDay}" onchange="strategies[${index}].runDay=Number(this.value)"><div class="form-text">Např. 14 = 14. den.</div></div><div class="col"><label>Hodina</label><input type="number" min="0" max="23" value="${strat.runHour}" onchange="strategies[${index}].runHour=Number(this.value)"></div></div>${timeHint}<div class="form-text">Doporučeno max 28. den.</div>`;
             }
 
             card.innerHTML = `
                 <button class="btn-delete" onclick="removeStrategy(${index})">🗑</button>
+                <div style="margin-bottom: 15px;"><strong style="color:var(--strat-color); font-size: 1.3rem; font-weight: 800;">${currCrypto} nákup</strong></div>
                 <div class="row" style="margin-bottom:10px">
                     <div class="col"><label>Chci koupit</label><select onchange="updatePair(${index}, 'crypto', this.value)">${SUPPORTED_COINS.map(c => `<option value="${c.code}" ${currCrypto===c.code?'selected':''}>${c.name}</option>`).join('')}</select></div>
                     <div class="col"><label>Platím v</label><select onchange="updatePair(${index}, 'fiat', this.value)"><option value="CZK" ${currFiat==='CZK'?'selected':''}>CZK</option><option value="EUR" ${currFiat==='EUR'?'selected':''}>EUR</option></select></div>
@@ -206,28 +206,19 @@
     }
 
     function updatePair(index, type, val) {
-        let [c, f] = strategies[index].pair.split('_');
+        let [c, f] = (strategies[index].pair || 'BTC_CZK').split('_');
         if(type === 'crypto') c = val; else f = val;
         strategies[index].pair = `${c}_${f}`;
         renderStrategies();
     }
-
-    function removeStrategy(index) {
-        if(confirm('Smazat tuto strategii?')) { strategies.splice(index, 1); renderStrategies(); }
-    }
-
-    function addStrategy() {
-        strategies.push({ label: 'Nový nákup', pair: 'BTC_CZK', amount: 100, frequency: 'weekly', runDay: 1, runHour: 10, dipPercentage: 0.02, active: true });
-        renderStrategies();
-    }
-
+    function removeStrategy(index) { if(confirm('Smazat tuto strategii?')) { strategies.splice(index, 1); renderStrategies(); } }
+    function addStrategy() { strategies.push({ pair: 'BTC_CZK', amount: 100, frequency: 'weekly', runDay: 1, runHour: 10, dipPercentage: 0.02, active: true }); renderStrategies(); }
     async function saveConfig() {
         const api = { clientId: document.getElementById('clientId').value, publicKey: document.getElementById('publicKey').value, privateKey: document.getElementById('privateKey').value };
         const newConfig = { api, strategies, settings: currentSettings };
         await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newConfig) });
         alert("Uloženo!");
     }
-
     async function loadPortfolio() {
         try {
             const res = await fetch(`/api/portfolio?currency=${selectedCurrency}`);
@@ -238,7 +229,6 @@
             document.getElementById('bot-trades').innerText = data.botStats.tradeCount;
         } catch(e) {}
     }
-
     function setCurrency(curr) { selectedCurrency = curr; document.querySelectorAll('.header .btn-outline').forEach(b => b.classList.remove('active')); document.getElementById(`curr-${curr}`).classList.add('active'); loadPortfolio(); }
     async function restartBot() { await fetch('/api/restart', { method: 'POST' }); alert("Bot se restartuje..."); }
     async function loadLogs() { try { const res = await fetch('/api/logs'); document.getElementById('logs').innerText = await res.text(); } catch(e) {} }
