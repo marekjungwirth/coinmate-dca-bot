@@ -181,13 +181,14 @@
                         <div class="col">
                             <label>Den v měsíci</label>
                             <input type="number" min="1" max="28" value="${strat.runDay}" onchange="strategies[${index}].runDay=Number(this.value)">
+                            <div class="form-text">Např. 14 = 14. den v měsíci.</div>
                         </div>
                         <div class="col">
                             <label>Hodina</label>
                             <input type="number" min="0" max="23" value="${strat.runHour}" onchange="strategies[${index}].runHour=Number(this.value)">
                         </div>
                     </div>
-                    <div class="form-text">Např. 14 = 14. den v měsíci. (Doporučeno max 28).</div>`;
+                    <div class="form-text">Doporučeno max 28. den kvůli únoru.</div>`;
             }
 
             card.innerHTML = `

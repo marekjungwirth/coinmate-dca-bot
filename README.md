@@ -5,71 +5,49 @@ Bot má vlastní **Webový Dashboard**, kde si vše jednoduše naklikáte. Žád
 
 ## ✨ Klíčové Funkce
 
-* **🖥️ Webové Rozhraní:** Krásný dashboard s grafy, statistikami a nastavením.
-* **🧠 Smart DCA:** Bot nekupuje tupě hned. Vypočítá 3-denní průměr a nastaví limitní příkaz se slevou (Dip).
-* **🛡️ Auto-Fallout:** Pokud se cena nepropadne a limitka se nevyplní, bot ji před dalším cyklem zruší a koupí okamžitě (Market), abyste o nákup nepřišli.
-* **📈 Portfolio Tracker:** Automaticky stahuje zůstatky z burzy, počítá hodnotu portfolia v CZK/EUR a ukazuje, kolik jste ušetřili díky Smart strategii.
-* **🐳 Docker Ready:** Stačí jeden příkaz a běží to kdekoliv (NAS, Raspberry Pi, VPS).
+* **📈 Portfolio Tracker:** Krásný dashboard s grafy růstu množství vašich assetů v čase.]
+* **🧠 Smart DCA s individuálním Dipem:** Každá mince má vlastní nastavení slevy (Dip %). Bot vypočítá průměr a nastaví limitku na míru každé kryptoměně.]
+* **🕒 Flexibilní časování:** Nákupy denně, týdně nebo měsíčně v přesně určený čas.]
+* **🛡️ Auto-Fallout:** Pokud se cena nepropadne pod vaši slevu, bot před koncem cyklu koupí za Market, abyste o nákup nepřišli.]
+* **🖥️ Portfolio v kapse:** Automatické stahování zůstatků z burzy a výpočet celkové hodnoty v CZK/EUR.]
 
 ---
 
 ## 🚀 Instalace (Nejjednodušší cesta)
 
-Pro spuštění potřebujete pouze **Docker**. Pokud máte NAS (Synology, QNAP, Asustor) nebo Linux server, máte vyhráno.
+Pro spuštění potřebujete pouze **Docker**.
 
 ### 1. Stažení
-Naklonujte si repozitář:
 ```bash
-git clone https://github.com/marekjungwirth/coinmate-dca-bot.git
+git clone [https://github.com/marekjungwirth/coinmate-dca-bot.git](https://github.com/marekjungwirth/coinmate-dca-bot.git)
 cd coinmate-dca-bot
 ```
 
 ### 2. Spuštění
-Spusťte bota na pozadí:
 ```bash
 docker compose up -d
 ```
-*(Pokud příkaz `docker compose` nefunguje, zkuste starší variantu `docker-compose up -d`)*
 
 ### 3. Hotovo! 🎉
-Otevřete prohlížeč a jděte na:
-**`http://IP-VAŠEHO-ZAŘÍZENÍ:8080`**
-
-*(Např. http://192.168.1.50:8080 nebo http://localhost:8080)*
-
-> **Tip:** Pokud port 8080 už používáte, otevřete soubor `docker-compose.yml` a změňte `"8080:3000"` například na `"8085:3000"`.
+Otevřete dashboard na portu 8085 (pokud jste jej nezměnili v configu):
+**`http://IP-VAŠEHO-ZAŘÍZENÍ:8085`**
 
 ---
 
 ## ⚙️ Jak to nastavit?
 
-1.  Otevřete Webový Dashboard (uvidíte prázdná pole).
-2.  V sekci **API Klíče** zadejte své údaje z Coinmate (Settings -> API).
-    * *Potřebná práva:* `Order book`, `Place limit/market orders`, `Balances`.
-3.  Klikněte na **💾 Uložit Změny**. Bot se restartuje a načte vaše portfolio.
-4.  V sekci **Strategie** klikněte na **+ Přidat Strategii**.
-    * Vyberte měnu (např. BTC), frekvenci (Týdně) a částku.
-5.  Uložte a máte hotovo! ✅
-
-Bot nyní běží na pozadí, hlídá čas a nakupuje za vás.
-
----
-
-## 🛠️ Pro pokročilé (Manuální instalace bez Dockeru)
-
-Pokud nechcete Docker, potřebujete Node.js v18+.
-
-```bash
-npm install
-node server.js
-```
-Web poběží na `http://localhost:3000`.
+1.  V sekci **🔐 API Klíče** zadejte své údaje z Coinmate.]
+2.  V sekci **🚀 Strategie** klikněte na **+ Přidat Strategii**.
+3.  U každé karty nastavte:
+    * **Částku** a **Frekvenci** (Denně / Týdně / Měsíčně).]
+    * **Individuální Dip %:** Vaše cílená sleva (např. 1.5 % pro BTC).]
+4.  Klikněte na **💾 Uložit Vše & Spustit**. Bot okamžitě naplánuje nákupy.]
 
 ---
 
 ## 🔒 Bezpečnost
-* API klíče jsou uloženy **pouze u vás** v lokálním souboru `data/config.json`.
-* Nikam se neposílají. Aplikace komunikuje přímo s Coinmate API.
+* API klíče jsou uloženy **pouze u vás** v souboru `data/config.json`.]
+* Aplikace komunikuje napřímo s Coinmate API.
 
 ---
 
