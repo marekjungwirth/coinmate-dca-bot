@@ -41,7 +41,7 @@ function startBot() {
     return false;
   }
 
-  logMessage("🤖 Starting scheduler...", "SYSTEM");
+  logMessage("🤖 Starting scheduler (Long-wait mode)...", "SYSTEM");
 
   config.strategies.forEach(strat => {
     if (strat.active === false) return;
@@ -49,7 +49,6 @@ function startBot() {
     const [crypto, fiat] = strat.pair.split('_');
     const coinGeckoId = COIN_MAPPING[crypto];
 
-    // Sestavení aktivní strategie - dipPercentage se bere přímo z objektu strategie
     const activeStrat = {
       ...strat, 
       coinGeckoId, 
@@ -57,24 +56,39 @@ function startBot() {
       minOrder: (fiat === 'EUR' ? 2 : 50),
       settings: {
           daysAverage: config.settings?.daysAverage || 3,
-          dipPercentage: strat.dipPercentage // Individuální hodnota pro každou kartu
+          dipPercentage: strat.dipPercentage
       }
     };
 
     const buyRule = new schedule.RecurrenceRule();
     const checkRule = new schedule.RecurrenceRule();
 
-    buyRule.hour = strat.runHour; buyRule.minute = 0;
-    checkRule.hour = strat.runHour; checkRule.minute = 55;
+    // NASTAVENÍ NÁKUPU (H:00)
+    buyRule.hour = strat.runHour; 
+    buyRule.minute = 0;
 
-    if (strat.frequency === 'weekly') buyRule.dayOfWeek = strat.runDay;
-    else if (strat.frequency === 'monthly') buyRule.date = strat.runDay;
-    else buyRule.dayOfWeek = new schedule.Range(0, 6); // Daily
+    // NASTAVENÍ KONTROLY (H-1 : 55) -> Téměř 24h trpělivost
+    checkRule.hour = (strat.runHour === 0) ? 23 : strat.runHour - 1; 
+    checkRule.minute = 55;
+
+    if (strat.frequency === 'weekly') {
+        buyRule.dayOfWeek = strat.runDay;
+        // Kontrola proběhne těsně před dalším týdenním nákupem
+        checkRule.dayOfWeek = strat.runDay; 
+    } else if (strat.frequency === 'monthly') {
+        buyRule.date = strat.runDay;
+        // Kontrola proběhne těsně před dalším měsíčním nákupem
+        checkRule.date = strat.runDay;
+    } else {
+        // Daily: Obě pravidla běží každý den
+        buyRule.dayOfWeek = new schedule.Range(0, 6);
+        checkRule.dayOfWeek = new schedule.Range(0, 6);
+    }
 
     scheduledJobs.push(schedule.scheduleJob(buyRule, () => runBuy(activeStrat)));
     scheduledJobs.push(schedule.scheduleJob(checkRule, () => runCheck(activeStrat)));
     
-    logMessage(`✅ Scheduled: ${strat.pair} (Dip: ${(strat.dipPercentage*100).toFixed(1)}%)`, "SYSTEM");
+    logMessage(`✅ Scheduled: ${strat.pair} (Buy at ${strat.runHour}:00, Check at ${checkRule.hour}:55)`, "SYSTEM");
   });
   return true;
 }
