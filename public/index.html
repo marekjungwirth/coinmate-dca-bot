@@ -8,21 +8,30 @@
     <style>
         :root {
             --bg: #0f172a; --card-bg: #1e293b; --text: #f1f5f9; --text-muted: #94a3b8;
-            --primary: #3b82f6; --success: #10b981; --danger: #ef4444; --border: #334155;
+            --primary: #3b82f6; --success: #10b981; --danger: #ef4444; --border: #334155; --input-bg: #0f172a;
         }
         body { margin: 0; font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); padding-bottom: 120px; }
         .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
         
+        /* Header */
         .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:30px; }
+        
+        /* Karty obecně */
         .card { background: var(--card-bg); border-radius: 12px; padding: 25px; border: 1px solid var(--border); margin-bottom: 20px; position: relative; }
         
+        /* Statistiky Grid */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+        .stat-box { background: var(--input-bg); border: 1px solid var(--border); padding: 15px; border-radius: 8px; text-align: center; }
+        .stat-label { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 5px; text-transform: uppercase; }
+        .stat-val { font-size: 1.3rem; font-weight: 800; }
+
         /* Grid pro strategie */
         .strategies-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; margin-bottom: 30px; }
         
         /* Karta strategie */
         .strategy-card { border-radius: 12px; border: 1px solid var(--border); border-top: 6px solid var(--strat-color); padding: 25px; background: var(--card-bg); position: relative; }
         
-        /* Tlačítko Přidat Strategii (Opraveno) */
+        /* Tlačítko Přidat Strategii */
         .add-card { 
             border: 2px dashed var(--border); 
             display: flex; flex-direction: column; align-items: center; justify-content: center; 
@@ -31,9 +40,11 @@
         }
         .add-card:hover { border-color: var(--primary); color: var(--primary); background: rgba(59, 130, 246, 0.05); }
 
-        .btn-delete { position: absolute; top: 15px; right: 15px; background: none; border: none; cursor: pointer; font-size: 1.5rem; opacity: 0.5; transition: 0.2s; padding: 5px; }
+        /* Koš */
+        .btn-delete { position: absolute; top: 15px; right: 15px; background: none; border: none; cursor: pointer; font-size: 1.5rem; opacity: 0.5; transition: 0.2s; padding: 5px; z-index: 10; }
         .btn-delete:hover { opacity: 1; color: var(--danger); transform: scale(1.1); }
         
+        /* Inputy a Layout */
         .row { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
         .col { flex: 1; min-width: 200px; }
         
@@ -51,14 +62,33 @@
         /* Logy */
         .log-window { background: #0f172a; color: #e2e8f0; padding: 15px; border-radius: 8px; height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.8rem; white-space: pre-wrap; }
 
+        /* Spodní lišta */
         .actions-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card-bg); padding: 20px; border-top: 1px solid var(--border); display: flex; justify-content: center; gap: 20px; z-index: 100; box-shadow: 0 -5px 20px rgba(0,0,0,0.3); }
         .btn { padding: 12px 25px; border-radius: 8px; border: none; font-weight: 700; cursor: pointer; color: white; }
+        
+        /* Měna přepínač */
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 5px 12px; font-size: 0.8rem; cursor: pointer; border-radius: 6px; }
+        .btn-outline.active { background: var(--primary); color: white; border-color: var(--primary); }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="header">
         <h2 style="color:var(--primary); margin:0;">🚀 Coinmate DCA Bot</h2>
+        <div style="display:flex; gap:5px;">
+             <button class="btn-outline active" id="curr-czk" onclick="setCurrency('czk')">CZK</button>
+             <button class="btn-outline" id="curr-eur" onclick="setCurrency('eur')">EUR</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-top:0">📊 Celkové Portfolio</h3>
+        <div class="stats-grid">
+            <div class="stat-box"><div class="stat-label">Hodnota na burze</div><div class="stat-val" style="color:var(--primary)" id="total-value">...</div></div>
+            <div class="stat-box"><div class="stat-label">Bot: Investováno</div><div class="stat-val" id="bot-invested">0</div></div>
+            <div class="stat-box"><div class="stat-label">Bot: Ušetřeno</div><div class="stat-val" style="color:var(--success)" id="bot-saved">0</div></div>
+            <div class="stat-box"><div class="stat-label">Počet obchodů</div><div class="stat-val" id="bot-trades">0</div></div>
+        </div>
     </div>
 
     <div class="card collapsible" id="api-card">
@@ -129,6 +159,7 @@
 
 <script>
     let strategies = [];
+    let selectedCurrency = 'czk';
     const COIN_COLORS = { 'BTC': '#f7931a', 'ETH': '#627eea', 'SOL': '#9945FF', 'LTC': '#345d9d' };
     const SUPPORTED_COINS = [{code:'BTC', name:'Bitcoin'}, {code:'ETH', name:'Ethereum'}, {code:'SOL', name:'Solana'}];
     const WEEK_DAYS = [{v:1, n:'Pondělí'}, {v:2, n:'Úterý'}, {v:3, n:'Středa'}, {v:4, n:'Čtvrtek'}, {v:5, n:'Pátek'}, {v:6, n:'Sobota'}, {v:0, n:'Neděle'}];
@@ -137,12 +168,15 @@
         try {
             const res = await fetch('/api/config');
             const data = await res.json();
+            
+            // Načtení API klíčů
             if(data.api) {
                 document.getElementById('clientId').value = data.api.clientId || '';
                 document.getElementById('publicKey').value = data.api.publicKey || '';
                 document.getElementById('privateKey').value = data.api.privateKey || '';
             }
             
+            // Načtení nastavení průměrování
             const set = data.settings || {};
             if (set.averageCalculation === 'last_buy') {
                 document.getElementById('modeLast').checked = true;
@@ -155,10 +189,31 @@
             
             toggleSettingsUI();
             
+            // Strategie a zbytek
             strategies = data.strategies || [];
             renderStrategies();
             loadChartData('all');
+            loadPortfolio(); // Inicializace statistik
         } catch(e) { console.error("Chyba při načítání dat", e); }
+    }
+
+    async function loadPortfolio() {
+        try {
+            const res = await fetch(`/api/portfolio?currency=${selectedCurrency}`);
+            const data = await res.json();
+            document.getElementById('total-value').innerText = `${Math.round(data.totalValue).toLocaleString()} ${selectedCurrency.toUpperCase()}`;
+            document.getElementById('bot-invested').innerText = `${Math.round(data.botStats.invested).toLocaleString()} ${selectedCurrency.toUpperCase()}`;
+            document.getElementById('bot-saved').innerText = `${Math.round(data.botStats.saved).toLocaleString()} ${selectedCurrency.toUpperCase()}`;
+            document.getElementById('bot-trades').innerText = data.botStats.tradeCount;
+        } catch(e) {}
+    }
+
+    function setCurrency(curr) { 
+        selectedCurrency = curr; 
+        document.getElementById(`curr-czk`).classList.remove('active');
+        document.getElementById(`curr-eur`).classList.remove('active');
+        document.getElementById(`curr-${curr}`).classList.add('active');
+        loadPortfolio(); 
     }
 
     function loadChartData(range) {
@@ -230,7 +285,7 @@
             container.appendChild(card);
         });
         
-        // Tlačítko Přidat Strategii (Opraveno)
+        // Tlačítko Přidat Strategii (ZDE SE PŘIDÁVÁ NAKONEC)
         const addBtn = document.createElement('div');
         addBtn.className = 'add-card';
         addBtn.innerHTML = "<span style='font-size:2.5rem;'>+</span><span style='font-weight:600; margin-top:10px;'>Přidat Strategii</span>";
