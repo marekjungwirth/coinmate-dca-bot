@@ -10,19 +10,36 @@
             --bg: #0f172a; --card-bg: #1e293b; --text: #f1f5f9; --text-muted: #94a3b8;
             --primary: #3b82f6; --success: #10b981; --danger: #ef4444; --border: #334155;
         }
-        body { margin: 0; font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); padding-bottom: 100px; }
+        body { margin: 0; font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); padding-bottom: 120px; }
         .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+        
+        .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:30px; }
         .card { background: var(--card-bg); border-radius: 12px; padding: 25px; border: 1px solid var(--border); margin-bottom: 20px; position: relative; }
-        .strategies-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+        
+        /* Grid pro strategie */
+        .strategies-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        
+        /* Karta strategie */
         .strategy-card { border-radius: 12px; border: 1px solid var(--border); border-top: 6px solid var(--strat-color); padding: 25px; background: var(--card-bg); position: relative; }
         
+        /* Tlačítko Přidat Strategii (Opraveno) */
+        .add-card { 
+            border: 2px dashed var(--border); 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            cursor: pointer; min-height: 480px; border-radius: 12px; 
+            color: var(--text-muted); transition: 0.2s;
+        }
+        .add-card:hover { border-color: var(--primary); color: var(--primary); background: rgba(59, 130, 246, 0.05); }
+
         .btn-delete { position: absolute; top: 15px; right: 15px; background: none; border: none; cursor: pointer; font-size: 1.5rem; opacity: 0.5; transition: 0.2s; padding: 5px; }
         .btn-delete:hover { opacity: 1; color: var(--danger); transform: scale(1.1); }
         
         .row { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
         .col { flex: 1; min-width: 200px; }
+        
         input[type="number"], input[type="text"], input[type="password"], select { width: 100%; padding: 12px; background: #0f172a; border: 1px solid var(--border); border-radius: 8px; color: white; font-family: inherit; box-sizing: border-box; }
         input:disabled, select:disabled { opacity: 0.5; cursor: not-allowed; }
+        
         label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; display: block; }
         .form-text { font-size: 0.75rem; color: var(--text-muted); margin-top: 5px; line-height: 1.4; }
         
@@ -31,15 +48,17 @@
         .radio-item { display: flex; align-items: center; gap: 10px; cursor: pointer; }
         input[type="radio"] { width: 18px; height: 18px; accent-color: var(--primary); cursor: pointer; margin: 0; }
 
-        .actions-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card-bg); padding: 20px; border-top: 1px solid var(--border); display: flex; justify-content: center; gap: 20px; z-index: 100; }
+        /* Logy */
+        .log-window { background: #0f172a; color: #e2e8f0; padding: 15px; border-radius: 8px; height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.8rem; white-space: pre-wrap; }
+
+        .actions-bar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card-bg); padding: 20px; border-top: 1px solid var(--border); display: flex; justify-content: center; gap: 20px; z-index: 100; box-shadow: 0 -5px 20px rgba(0,0,0,0.3); }
         .btn { padding: 12px 25px; border-radius: 8px; border: none; font-weight: 700; cursor: pointer; color: white; }
     </style>
 </head>
 <body>
 <div class="container">
-    <div class="header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
+    <div class="header">
         <h2 style="color:var(--primary); margin:0;">🚀 Coinmate DCA Bot</h2>
-        <div id="portfolio-mini-stats" style="font-weight:600;"></div>
     </div>
 
     <div class="card collapsible" id="api-card">
@@ -73,7 +92,6 @@
                     </div>
                 </div>
             </div>
-
             <div class="col">
                 <label>Délka intervalu</label>
                 <div style="display: flex; gap: 10px;">
@@ -90,12 +108,17 @@
         </div>
     </div>
 
-    <h3 style="margin: 20px 0;">🚀 Aktivní Strategie</h3>
+    <h3 style="margin: 30px 0 20px 0;">🚀 Aktivní Strategie</h3>
     <div class="strategies-grid" id="strategies-container"></div>
 
-    <div class="card mt-3">
+    <div class="card" style="margin-top: 30px;">
         <h3 style="margin-top:0">📈 Růst Portfolia</h3>
         <div style="height: 300px;"><canvas id="portfolioChart"></canvas></div>
+    </div>
+
+    <div class="card mt-3">
+        <h3 style="margin-top:0">📜 Systémové Logy</h3>
+        <div class="log-window" id="logs">Načítám logy...</div>
     </div>
 </div>
 
@@ -111,29 +134,51 @@
     const WEEK_DAYS = [{v:1, n:'Pondělí'}, {v:2, n:'Úterý'}, {v:3, n:'Středa'}, {v:4, n:'Čtvrtek'}, {v:5, n:'Pátek'}, {v:6, n:'Sobota'}, {v:0, n:'Neděle'}];
 
     async function loadData() {
-        const res = await fetch('/api/config');
-        const data = await res.json();
-        if(data.api) {
-            document.getElementById('clientId').value = data.api.clientId || '';
-            document.getElementById('publicKey').value = data.api.publicKey || '';
-            document.getElementById('privateKey').value = data.api.privateKey || '';
-        }
-        
-        // Načtení nastavení průměrování
-        const set = data.settings || {};
-        if (set.averageCalculation === 'last_buy') {
-            document.getElementById('modeLast').checked = true;
-        } else {
-            document.getElementById('modeFixed').checked = true;
-        }
-        
-        document.getElementById('fixedValue').value = set.fixedValue || 3;
-        document.getElementById('fixedUnit').value = set.fixedUnit || 'days';
-        
-        toggleSettingsUI(); // Nastaví enabled/disabled stav a texty
-        
-        strategies = data.strategies || [];
-        renderStrategies();
+        try {
+            const res = await fetch('/api/config');
+            const data = await res.json();
+            if(data.api) {
+                document.getElementById('clientId').value = data.api.clientId || '';
+                document.getElementById('publicKey').value = data.api.publicKey || '';
+                document.getElementById('privateKey').value = data.api.privateKey || '';
+            }
+            
+            const set = data.settings || {};
+            if (set.averageCalculation === 'last_buy') {
+                document.getElementById('modeLast').checked = true;
+            } else {
+                document.getElementById('modeFixed').checked = true;
+            }
+            
+            document.getElementById('fixedValue').value = set.fixedValue || 3;
+            document.getElementById('fixedUnit').value = set.fixedUnit || 'days';
+            
+            toggleSettingsUI();
+            
+            strategies = data.strategies || [];
+            renderStrategies();
+            loadChartData('all');
+        } catch(e) { console.error("Chyba při načítání dat", e); }
+    }
+
+    function loadChartData(range) {
+        fetch(`/api/stats?range=${range}`)
+            .then(res => res.json())
+            .then(data => {
+                const ctx = document.getElementById('portfolioChart').getContext('2d');
+                if (window.myChart) window.myChart.destroy();
+                window.myChart = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: data.labels, datasets: data.datasets },
+                    options: { 
+                        responsive: true, 
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        scales: { y: { beginAtZero: false } }
+                    }
+                });
+            })
+            .catch(e => console.error("Graf se nepodařilo načíst", e));
     }
 
     function toggleSettingsUI() {
@@ -163,12 +208,14 @@
             card.style.setProperty('--strat-color', COIN_COLORS[coin] || '#888');
             
             let timeFields = '';
+            const timeHint = `<div class="form-text">Pozn: Čas 14 = 14:00. Bot nakoupí v tuto hodinu a bude čekat na Dip téměř 24h.</div>`;
+
             if(strat.frequency === 'daily') {
-                timeFields = `<label>Hodina (0-23)</label><input type="number" value="${strat.runHour}" onchange="strategies[${index}].runHour=Number(this.value)">`;
+                timeFields = `<label>Hodina (0-23)</label><input type="number" value="${strat.runHour}" onchange="strategies[${index}].runHour=Number(this.value)">${timeHint}`;
             } else if(strat.frequency === 'weekly') {
-                timeFields = `<div class="row"><div class="col"><label>Den</label><select onchange="strategies[${index}].runDay=Number(this.value)">${WEEK_DAYS.map(d=>`<option value="${d.v}" ${strat.runDay===d.v?'selected':''}>${d.n}</option>`).join('')}</select></div><div class="col"><label>Hodina</label><input type="number" value="${strat.runHour}" onchange="strategies[${index}].runHour=Number(this.value)"></div></div>`;
+                timeFields = `<div class="row"><div class="col"><label>Den</label><select onchange="strategies[${index}].runDay=Number(this.value)">${WEEK_DAYS.map(d=>`<option value="${d.v}" ${strat.runDay===d.v?'selected':''}>${d.n}</option>`).join('')}</select></div><div class="col"><label>Hodina</label><input type="number" value="${strat.runHour}" onchange="strategies[${index}].runHour=Number(this.value)"></div></div>${timeHint}`;
             } else {
-                timeFields = `<div class="row"><div class="col"><label>Den v měsíci</label><input type="number" value="${strat.runDay}" onchange="strategies[${index}].runDay=Number(this.value)"></div><div class="col"><label>Hodina</label><input type="number" value="${strat.runHour}" onchange="strategies[${index}].runHour=Number(this.value)"></div></div>`;
+                timeFields = `<div class="row"><div class="col"><label>Den v měsíci</label><input type="number" value="${strat.runDay}" onchange="strategies[${index}].runDay=Number(this.value)"></div><div class="col"><label>Hodina</label><input type="number" value="${strat.runHour}" onchange="strategies[${index}].runHour=Number(this.value)"></div></div>${timeHint}`;
             }
 
             card.innerHTML = `
@@ -179,10 +226,16 @@
                 <div class="mt-3"><label>Dip (%)</label><input type="number" step="0.1" value="${(strat.dipPercentage*100).toFixed(1)}" onchange="strategies[${index}].dipPercentage=Number(this.value)/100"></div>
                 <div class="mt-3"><label>Frekvence</label><select onchange="strategies[${index}].frequency=this.value; renderStrategies();"><option value="daily" ${strat.frequency==='daily'?'selected':''}>Denně</option><option value="weekly" ${strat.frequency==='weekly'?'selected':''}>Týdně</option><option value="monthly" ${strat.frequency==='monthly'?'selected':''}>Měsíčně</option></select></div>
                 <div class="mt-3">${timeFields}</div>
-                <div class="form-text">Pozn: Čas 14 = 14:00. Bot nakoupí v tuto hodinu a bude čekat na Dip téměř 24h.</div>
             `;
             container.appendChild(card);
         });
+        
+        // Tlačítko Přidat Strategii (Opraveno)
+        const addBtn = document.createElement('div');
+        addBtn.className = 'add-card';
+        addBtn.innerHTML = "<span style='font-size:2.5rem;'>+</span><span style='font-weight:600; margin-top:10px;'>Přidat Strategii</span>";
+        addBtn.onclick = addStrategy;
+        container.appendChild(addBtn);
     }
 
     function updatePair(idx, pos, val) {
@@ -190,10 +243,10 @@
         p[pos] = val; strategies[idx].pair = p.join('_'); renderStrategies();
     }
     function removeStrategy(idx) { if(confirm('Smazat?')) { strategies.splice(idx,1); renderStrategies(); } }
+    function addStrategy() { strategies.push({ pair: 'BTC_CZK', amount: 100, frequency: 'weekly', runDay: 1, runHour: 10, dipPercentage: 0.02, active: true }); renderStrategies(); }
+    
     async function saveConfig() {
         const api = { clientId: document.getElementById('clientId').value, publicKey: document.getElementById('publicKey').value, privateKey: document.getElementById('privateKey').value };
-        
-        // Načtení nového nastavení
         const averageCalculation = document.getElementById('modeLast').checked ? 'last_buy' : 'fixed';
         const fixedValue = Number(document.getElementById('fixedValue').value) || 3;
         const fixedUnit = document.getElementById('fixedUnit').value;
@@ -209,7 +262,17 @@
         });
         alert('Uloženo!');
     }
+    async function restartBot() { await fetch('/api/restart', { method: 'POST' }); alert("Bot se restartuje..."); }
+    
+    function loadLogs() { 
+        fetch('/api/logs').then(res => res.text()).then(txt => {
+            const el = document.getElementById('logs');
+            if(el) el.innerText = txt;
+        }).catch(e => {});
+    }
+
     loadData();
+    setInterval(loadLogs, 5000);
 </script>
 </body>
 </html>
