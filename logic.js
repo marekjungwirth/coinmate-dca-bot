@@ -9,16 +9,23 @@ async function runBuy(strat) {
     logMessage(`🚀 Spouštím nákupní strategii pro ${pair}`, "STRAT");
 
     try {
-        // 1. Zjistit aktuální cenu (Market Price v čase spuštění)
+        // 1. Zjistit aktuální cenu
         const orderBook = await coinmateApiCall('orderBook', { currencyPair: pair, limit: 2 });
-        if (!orderBook) return;
+        
+        // PŘIDÁNO: Diagnostika, pokud se nepodaří stáhnout cenu
+        if (!orderBook) {
+            logMessage(`❌ Chyba: Burza nevrátila OrderBook (aktuální cenu) pro ${pair}. Končím.`, "ERROR");
+            return;
+        }
         
         const currentPrice = (Number(orderBook.bids[0].price) + Number(orderBook.asks[0].price)) / 2;
 
         // 2. Zjistit férovou cenu (Průměr)
         const avgPrice = await getMarketAverage(pair, strat.settings);
+        
+        // PŘIDÁNO: Diagnostika, pokud selže výpočet průměru
         if (!avgPrice) {
-            logMessage("❌ Nepodařilo se získat historická data.", "ERROR");
+            logMessage(`❌ Chyba: Nepodařilo se spočítat průměrnou cenu (chybí historie?). Končím.`, "ERROR");
             return;
         }
 
@@ -31,35 +38,43 @@ async function runBuy(strat) {
         // 4. Rozhodnutí
         if (currentPrice <= targetPrice) {
             logMessage(`🔥 Cena je super! Kupuji hned.`, "TRADE");
-            // Posíláme currentPrice jako "refPrice" pro výpočet úspory (zde bude úspora 0 nebo záporná/kladná podle volatility, ale technicky kupujeme za market)
             await placeOrder(strat, currentPrice, "market", currentPrice); 
         } else {
-            logMessage(`⏳ Cena je vysoko. Nastavuji Limitku.`, "TRADE");
-            // Posíláme currentPrice jako referenci, abychom věděli, kolik jsme ušetřili oproti nákupu teď hned
+            logMessage(`⏳ Cena je vysoko (Cíl: ${Math.round(targetPrice)}). Nastavuji Limitku.`, "TRADE");
             await placeOrder(strat, targetPrice, "limit", currentPrice);
         }
 
     } catch (error) {
-        logMessage(`Chyba při nákupu: ${error.message}`, "ERROR");
+        logMessage(`💥 Kritická chyba ve funkci runBuy: ${error.message}`, "ERROR");
+        console.error(error);
     }
 }
 
 async function runCheck(strat) {
-    // Autofallout logika: zruší staré limitky po 24h a koupí market
     logMessage(`🕵️ Kontrola nevyřízených objednávek pro ${strat.pair}...`, "SYSTEM");
     
     try {
         const openOrders = await coinmateApiCall('openOrders', { currencyPair: strat.pair });
-        if (openOrders && openOrders.entries) {
+        
+        // PŘIDÁNO: Kontrola, zda API vůbec odpovědělo
+        if (!openOrders) {
+            logMessage(`⚠️ Varování: Nelze načíst otevřené objednávky (API neodpovídá).`, "warn");
+            return;
+        }
+
+        if (openOrders.entries) {
             for (const order of openOrders.entries) {
                 await coinmateApiCall('cancelOrder', { orderId: order.id });
                 logMessage(`❌ Ruším starou limitku ID ${order.id}.`, "SYSTEM");
             }
             // Koupit marketem (Autofallout)
             await placeOrder(strat, 0, "market_autofallout");
+        } else {
+            // Pokud nejsou žádné orders, je to ok, ale pro debug to můžeme zmínit
+            // logMessage(`ℹ️ Žádné otevřené objednávky k zrušení.`, "SYSTEM");
         }
     } catch (e) {
-        console.error(e);
+        logMessage(`Chyba při kontrole (runCheck): ${e.message}`, "ERROR");
     }
 }
 
@@ -98,12 +113,14 @@ async function getMarketAverage(pair, settings) {
         let sum = 0;
         data.forEach(t => sum += Number(t.price));
         return sum / data.length;
+    } else {
+        logMessage(`⚠️ API vrátilo prázdnou historii pro ${pair} za posledních ${minutesHistory} minut.`, "warn");
     }
     return null;
 }
 
 function getLastTradeDate(pair) {
-    const history = getHistory(); // Načte data/transactions.json
+    const history = getHistory(); 
     const trades = history.filter(t => t.pair === pair).sort((a, b) => new Date(b.date) - new Date(a.date));
     return trades.length > 0 ? trades[0].date : null;
 }
@@ -112,9 +129,13 @@ async function placeOrder(strat, price, type, referenceMarketPrice) {
     const amountFiat = strat.amount;
     
     if (type === "market_autofallout") {
-        await coinmateApiCall('buyInstant', { total: amountFiat, currencyPair: strat.pair });
-        logMessage(`✅ Market nákup (Autofallout) dokončen.`, "TRADE");
-        recordTransaction(strat, amountFiat, 0); // U autofalloutu je úspora 0 (koupili jsme za market)
+        const res = await coinmateApiCall('buyInstant', { total: amountFiat, currencyPair: strat.pair });
+        if (res && res.success) {
+            logMessage(`✅ Market nákup (Autofallout) dokončen.`, "TRADE");
+            recordTransaction(strat, amountFiat, 0); 
+        } else {
+             logMessage(`❌ Chyba Market nákupu: ${JSON.stringify(res)}`, "ERROR");
+        }
         return;
     }
 
@@ -122,22 +143,19 @@ async function placeOrder(strat, price, type, referenceMarketPrice) {
     const res = await coinmateApiCall('buyLimit', { amount: amountCrypto, price: price, currencyPair: strat.pair });
     
     if (res && res.success) {
-        // Vypočítat REÁLNOU úsporu: (Kolik bych zaplatil teď) - (Kolik platím limitkou)
-        // Vzorec: Investice * ((MarketCena / LimitCena) - 1)
         let savings = 0;
         if (referenceMarketPrice && price < referenceMarketPrice) {
             savings = amountFiat * ((referenceMarketPrice / price) - 1);
         }
 
         if (type === "market") {
-             // Simulujeme okamžitý nákup
              recordTransaction(strat, amountFiat, 0); 
         } else {
             logMessage(`✅ Limitka za ${price}. Teoretická úspora: ${Math.round(savings)} CZK`, "TRADE");
-            // Poznámka: Zapisujeme to do JSONu hned při vystavení, 
-            // správně by se to mělo zapsat až po vyplnění (fill), ale pro jednoduchost bota to zapisujeme teď.
             recordTransaction(strat, amountFiat, savings); 
         }
+    } else {
+        logMessage(`❌ Chyba při zadávání Limitky: ${JSON.stringify(res)}`, "ERROR");
     }
 }
 
@@ -146,8 +164,8 @@ function recordTransaction(strat, fiat, savings) {
         date: new Date().toISOString(),
         pair: strat.pair,
         amountFiat: fiat,
-        amountCrypto: fiat / (strat.pair.includes('EUR') ? 25000 : 1000000), // Odhad pro graf
-        savings: Number(savings.toFixed(2)) // Uložíme hezké číslo na 2 desetinná místa
+        amountCrypto: fiat / (strat.pair.includes('EUR') ? 25000 : 1000000), 
+        savings: Number(savings.toFixed(2))
     };
     
     let history = [];
