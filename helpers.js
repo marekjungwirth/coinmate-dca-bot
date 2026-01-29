@@ -1,7 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const fetch = require('node-fetch');
-const CryptoJS = require('crypto-js');
+// Pokud používáš Node 18+, fetch je nativní, ale necháváme require pokud ho tam máš nainstalovaný
+try { var fetch = require('node-fetch'); } catch (e) {} 
+const crypto = require('crypto'); // Přešli jsme na nativní crypto (stejné jako v debug_v2.js)
 
 const DATA_DIR = path.resolve(__dirname, 'data');
 const CONFIG_PATH = path.join(DATA_DIR, 'config.json');
@@ -9,8 +10,9 @@ const LOG_FILE = path.resolve(__dirname, 'bot.log');
 const STATE_FILE = path.resolve(__dirname, 'bot_state.json');
 const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
 
+// Zajištění existence adresáře
 if (!fs.existsSync(DATA_DIR)) {
-    try { fs.mkdirSync(DATA_DIR); } catch(e) {}
+    try { fs.mkdirSync(DATA_DIR, { recursive: true }); } catch(e) {}
 }
 
 function getConfig() {
@@ -24,7 +26,11 @@ function logMessage(message, label = 'SYSTEM') {
   const timestamp = new Date().toISOString();
   const logEntry = `[${timestamp}] [${label}] ${message}\n`;
   console.log(logEntry.trim());
-  fs.appendFileSync(LOG_FILE, logEntry, 'utf8');
+  try {
+      fs.appendFileSync(LOG_FILE, logEntry, 'utf8');
+  } catch (e) {
+      console.error("Log error:", e);
+  }
 }
 
 function addToHistory(trade) {
@@ -70,6 +76,7 @@ async function getCurrentPrices(coinIds, vsCurrency = 'czk') {
     }
 }
 
+// --- TOTO JE TA OPRAVENÁ FUNKCE (JÁDRO PROBLÉMU) ---
 async function coinmateApiCall(endpoint, params = {}) {
   const config = getConfig();
   
@@ -82,22 +89,34 @@ async function coinmateApiCall(endpoint, params = {}) {
   const publicKey = String(config.api.publicKey).trim();
   const privateKey = String(config.api.privateKey).trim();
 
+  // 1. Podpis pomocí nativního crypto (ověřeno v debug_v2.js)
   const nonce = Date.now();
   const message = "" + nonce + clientId + publicKey;
-  const signature = CryptoJS.HmacSHA256(message, privateKey).toString(CryptoJS.enc.Hex).toUpperCase();
   
-  const body = new URLSearchParams({ 
-      clientId: clientId, 
-      publicKey: publicKey, 
-      nonce: String(nonce), 
-      signature: signature, 
-      ...params 
-  });
+  const signature = crypto.createHmac('sha256', privateKey)
+                          .update(message)
+                          .digest('hex')
+                          .toUpperCase();
+  
+  // 2. Sestavení Form Data (URLSearchParams)
+  const bodyParams = new URLSearchParams();
+  bodyParams.append('clientId', clientId);
+  bodyParams.append('publicKey', publicKey);
+  bodyParams.append('nonce', nonce);
+  bodyParams.append('signature', signature);
+
+  // Přidání dalších parametrů
+  for (const key in params) {
+      bodyParams.append(key, params[key]);
+  }
 
   try {
     const res = await fetch(`https://coinmate.io/api/${endpoint}`, {
-      method: 'POST', body: body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      method: 'POST', 
+      body: bodyParams 
+      // Headers netřeba nastavovat, fetch si je u URLSearchParams nastaví sám správně
     });
+    
     const json = await res.json();
     
     if (json.error) {
@@ -111,6 +130,7 @@ async function coinmateApiCall(endpoint, params = {}) {
     return null;
   }
 }
+// ----------------------------------------------------
 
 function readState(pair) {
   if (fs.existsSync(STATE_FILE)) {
