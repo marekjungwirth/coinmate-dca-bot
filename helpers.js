@@ -1,8 +1,16 @@
 const fs = require('fs');
 const path = require('path');
-// Pokud používáš Node 18+, fetch je nativní, ale necháváme require pokud ho tam máš nainstalovaný
-try { var fetch = require('node-fetch'); } catch (e) {} 
-const crypto = require('crypto'); // Přešli jsme na nativní crypto (stejné jako v debug_v2.js)
+// Pokud používáš Node 18+, fetch je nativní.
+// Pokud ne, použijeme node-fetch z package.json.
+let fetch;
+try {
+    fetch = require('node-fetch');
+} catch (e) {
+    fetch = global.fetch;
+}
+
+// Přešli jsme na nativní crypto (stejné jako v debug_v2.js)
+const crypto = require('crypto'); 
 
 const DATA_DIR = path.resolve(__dirname, 'data');
 const CONFIG_PATH = path.join(DATA_DIR, 'config.json');
@@ -76,7 +84,7 @@ async function getCurrentPrices(coinIds, vsCurrency = 'czk') {
     }
 }
 
-// --- TOTO JE TA OPRAVENÁ FUNKCE (JÁDRO PROBLÉMU) ---
+// --- TOTO JE TA OPRAVENÁ FUNKCE ---
 async function coinmateApiCall(endpoint, params = {}) {
   const config = getConfig();
   
@@ -89,7 +97,7 @@ async function coinmateApiCall(endpoint, params = {}) {
   const publicKey = String(config.api.publicKey).trim();
   const privateKey = String(config.api.privateKey).trim();
 
-  // 1. Podpis pomocí nativního crypto (ověřeno v debug_v2.js)
+  // 1. Podpis (Nativní crypto)
   const nonce = Date.now();
   const message = "" + nonce + clientId + publicKey;
   
@@ -98,23 +106,25 @@ async function coinmateApiCall(endpoint, params = {}) {
                           .digest('hex')
                           .toUpperCase();
   
-  // 2. Sestavení Form Data (URLSearchParams)
+  // 2. Sestavení Form Data
   const bodyParams = new URLSearchParams();
   bodyParams.append('clientId', clientId);
   bodyParams.append('publicKey', publicKey);
   bodyParams.append('nonce', nonce);
   bodyParams.append('signature', signature);
 
-  // Přidání dalších parametrů
   for (const key in params) {
       bodyParams.append(key, params[key]);
   }
 
   try {
+    // 3. Volání API (Kompatibilní s node-fetch v2 i nativním fetch)
     const res = await fetch(`https://coinmate.io/api/${endpoint}`, {
       method: 'POST', 
-      body: bodyParams 
-      // Headers netřeba nastavovat, fetch si je u URLSearchParams nastaví sám správně
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded' // NUTNÉ pro node-fetch v2
+      },
+      body: bodyParams.toString() // NUTNÉ převést na string pro node-fetch v2
     });
     
     const json = await res.json();
@@ -126,7 +136,7 @@ async function coinmateApiCall(endpoint, params = {}) {
     return json.data;
 
   } catch (error) {
-    logMessage(`Network Error: ${error.message}`, 'ERROR');
+    logMessage(`Network Error (${endpoint}): ${error.message}`, 'ERROR');
     return null;
   }
 }
