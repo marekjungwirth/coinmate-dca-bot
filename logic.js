@@ -9,17 +9,18 @@ async function runBuy(strat) {
     logMessage(`🚀 Spouštím nákupní strategii pro ${pair}`, "STRAT");
 
     try {
-        // 1. Zjistit aktuální cenu
-        const orderBook = await coinmateApiCall('orderBook', { currencyPair: pair, limit: 2 });
+    	
+        // 1. Zjistit aktuální cenu (Ticker je spolehlivější než OrderBook)
+        const ticker = await coinmateApiCall('ticker', { currencyPair: pair });
         
-        // PŘIDÁNO: Diagnostika, pokud se nepodaří stáhnout cenu
-        if (!orderBook) {
-            logMessage(`❌ Chyba: Burza nevrátila OrderBook (aktuální cenu) pro ${pair}. Končím.`, "ERROR");
+        if (!ticker) {
+            logMessage(`❌ Chyba: Burza nevrátila Ticker (aktuální cenu) pro ${pair}. Končím.`, "ERROR");
             return;
         }
         
-        const currentPrice = (Number(orderBook.bids[0].price) + Number(orderBook.asks[0].price)) / 2;
-
+        // Použijeme 'last' (cena posledního obchodu)
+        const currentPrice = Number(ticker.last);
+        
         // 2. Zjistit férovou cenu (Průměr)
         const avgPrice = await getMarketAverage(pair, strat.settings);
         
