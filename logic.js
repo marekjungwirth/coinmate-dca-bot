@@ -57,22 +57,17 @@ async function runCheck(strat) {
     try {
         const openOrders = await coinmateApiCall('openOrders', { currencyPair: strat.pair });
         
-        // PŘIDÁNO: Kontrola, zda API vůbec odpovědělo
-        if (!openOrders) {
-            logMessage(`⚠️ Varování: Nelze načíst otevřené objednávky (API neodpovídá).`, "warn");
-            return;
-        }
-
-        if (openOrders.entries) {
-            for (const order of openOrders.entries) {
+        // OPRAVA DLE CLAUDA: Ověřujeme, zda je to pole a má prvky
+        if (Array.isArray(openOrders) && openOrders.length > 0) {
+            for (const order of openOrders) {
                 await coinmateApiCall('cancelOrder', { orderId: order.id });
                 logMessage(`❌ Ruším starou limitku ID ${order.id}.`, "SYSTEM");
             }
             // Koupit marketem (Autofallout)
             await placeOrder(strat, 0, "market_autofallout");
         } else {
-            // Pokud nejsou žádné orders, je to ok, ale pro debug to můžeme zmínit
-            // logMessage(`ℹ️ Žádné otevřené objednávky k zrušení.`, "SYSTEM");
+             // Žádné objednávky nebo divná odpověď - nic neděláme, je to OK
+             // logMessage(`ℹ️ Žádné otevřené objednávky.`, "SYSTEM");
         }
     } catch (e) {
         logMessage(`Chyba při kontrole (runCheck): ${e.message}`, "ERROR");
@@ -107,16 +102,22 @@ async function getMarketAverage(pair, settings) {
         if (unit === 'months') minutesHistory = val * 43200;
     }
 
-    // Volání API
-    const data = await coinmateApiCall('tradingHistory', { currencyPair: pair, minutesIntoHistory: minutesHistory });
+    // ZÁSADNÍ ZMĚNA: Používáme 'transactions' (tržní data), ne 'tradingHistory' (moje data)
+    const data = await coinmateApiCall('transactions', { currencyPair: pair, minutesIntoHistory: minutesHistory });
     
-    if (data && data.length > 0) {
+    if (Array.isArray(data) && data.length > 0) {
         let sum = 0;
         data.forEach(t => sum += Number(t.price));
         return sum / data.length;
-    } else {
-        logMessage(`⚠️ API vrátilo prázdnou historii pro ${pair} za posledních ${minutesHistory} minut.`, "warn");
+    } 
+    
+    // FALLBACK (Pojistka dle Clauda): Pokud API selže nebo vrátí prázdno, zkusíme Ticker
+    logMessage(`⚠️ Historie trhu je prázdná, zkouším náhradní řešení (Ticker)...`, "warn");
+    const ticker = await coinmateApiCall('ticker', { currencyPair: pair });
+    if (ticker && ticker.last) {
+        return Number(ticker.last);
     }
+
     return null;
 }
 
