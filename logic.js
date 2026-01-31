@@ -141,7 +141,11 @@ async function placeOrder(strat, price, type, referenceMarketPrice) {
         return;
     }
 
-    const amountCrypto = amountFiat / price;
+
+	// FIX: Oříznutí na 8 desetinných míst (Coinmate limit pro BTC)
+	// Použijeme toFixed(8), který vrátí string, což API v pohodě bere
+    const amountCrypto = (amountFiat / price).toFixed(8);
+	    
     const res = await coinmateApiCall('buyLimit', { amount: amountCrypto, price: price, currencyPair: strat.pair });
     
     if (res && res.success) {
