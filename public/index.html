@@ -160,8 +160,26 @@
 <script>
     let strategies = [];
     let selectedCurrency = 'czk';
-    const COIN_COLORS = { 'BTC': '#f7931a', 'ETH': '#627eea', 'SOL': '#9945FF', 'LTC': '#345d9d' };
-    const SUPPORTED_COINS = [{code:'BTC', name:'Bitcoin'}, {code:'ETH', name:'Ethereum'}, {code:'SOL', name:'Solana'}];
+    // 🎨 Barvy pro grafy a karty (Jen Advanced Trading páry)
+            const COIN_COLORS = { 
+                'BTC': '#f7931a', 
+                'ETH': '#627eea', 
+                'SOL': '#9945FF', 
+                'LTC': '#345d9d', 
+                'XRP': '#23292f', 
+                'ADA': '#0033ad'
+            };
+        
+            // 💰 Seznam kryptoměn (Jen Advanced Trading páry)
+            const SUPPORTED_COINS = [
+                {code:'BTC', name:'Bitcoin'}, 
+                {code:'ETH', name:'Ethereum'}, 
+                {code:'SOL', name:'Solana'},
+                {code:'LTC', name:'Litecoin'},
+                {code:'XRP', name:'Ripple'},
+                {code:'ADA', name:'Cardano'}
+            ];
+            
     const WEEK_DAYS = [{v:1, n:'Pondělí'}, {v:2, n:'Úterý'}, {v:3, n:'Středa'}, {v:4, n:'Čtvrtek'}, {v:5, n:'Pátek'}, {v:6, n:'Sobota'}, {v:0, n:'Neděle'}];
 
     async function loadData() {
