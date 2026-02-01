@@ -146,7 +146,6 @@ async function placeOrder(strat, price, type, referenceMarketPrice) {
     }
 
     // --- CHYTRÉ ZAOKROUHLOVÁNÍ ---
-    // Načteme nastavení pro konkrétní pár, nebo použijeme default
     const rounding = PAIR_SETTINGS[strat.pair] || { price: 2, amount: 4 };
 
     // 1. Množství (Amount)
@@ -163,16 +162,23 @@ async function placeOrder(strat, price, type, referenceMarketPrice) {
         currencyPair: strat.pair 
     });
     
-    if (res && res.success) {
+    // OPRAVA: Coinmate vrací ID objednávky jako číslo (nebo string s číslem) při úspěchu
+    // nebo objekt { success: true }
+    const isSuccess = (res && res.success) || (res && !isNaN(res)); 
+
+    if (isSuccess) {
         let savings = 0;
         if (referenceMarketPrice && price < referenceMarketPrice) {
             savings = amountFiat * ((referenceMarketPrice / price) - 1);
         }
 
+        const orderId = res.success ? res.data : res; // Získáme ID
+
         if (type === "market") {
+             logMessage(`✅ Okamžitý nákup (Limitka za market cenu) ID ${orderId}.`, "TRADE");
              recordTransaction(strat, amountFiat, 0); 
         } else {
-            logMessage(`✅ Limitka za ${cleanPrice}. Teoretická úspora: ${Math.round(savings)} CZK`, "TRADE");
+            logMessage(`✅ Limitka za ${cleanPrice} zadána (ID ${orderId}). Teoretická úspora: ${Math.round(savings)} CZK`, "TRADE");
             recordTransaction(strat, amountFiat, savings); 
         }
     } else {
