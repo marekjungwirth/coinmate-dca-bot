@@ -4,12 +4,22 @@ const { coinmateApiCall, logMessage, getHistory } = require('./helpers');
 
 const TRANSACTIONS_PATH = path.join(__dirname, 'data', 'transactions.json');
 
+// ⚙️ NASTAVENÍ PŘESNOSTI PRO JEDNOTLIVÉ PÁRY
+// Pokud tu pár není, použije se default (Price: 2, Amount: 4)
+const PAIR_SETTINGS = {
+    'BTC_CZK': { price: 0, amount: 8 },  // BTC: Cena bez haléřů, Množství hodně desetinných
+    'ETH_CZK': { price: 0, amount: 8 },  // ETH: Podobně jako BTC
+    'SOL_CZK': { price: 2, amount: 4 },  // SOL: Cena s haléři, Množství na 4 místa (dle erroru)
+    'LTC_CZK': { price: 2, amount: 8 },
+    'XRP_CZK': { price: 4, amount: 2 },
+    'ADA_CZK': { price: 4, amount: 2 }
+};
+
 async function runBuy(strat) {
     const pair = strat.pair;
     logMessage(`🚀 Spouštím nákupní strategii pro ${pair}`, "STRAT");
 
     try {
-    	
         // 1. Zjistit aktuální cenu (Ticker je spolehlivější než OrderBook)
         const ticker = await coinmateApiCall('ticker', { currencyPair: pair });
         
@@ -57,7 +67,7 @@ async function runCheck(strat) {
     try {
         const openOrders = await coinmateApiCall('openOrders', { currencyPair: strat.pair });
         
-        // OPRAVA DLE CLAUDA: Ověřujeme, zda je to pole a má prvky
+        // Bezpečná kontrola pole
         if (Array.isArray(openOrders) && openOrders.length > 0) {
             for (const order of openOrders) {
                 await coinmateApiCall('cancelOrder', { orderId: order.id });
@@ -65,10 +75,7 @@ async function runCheck(strat) {
             }
             // Koupit marketem (Autofallout)
             await placeOrder(strat, 0, "market_autofallout");
-        } else {
-             // Žádné objednávky nebo divná odpověď - nic neděláme, je to OK
-             // logMessage(`ℹ️ Žádné otevřené objednávky.`, "SYSTEM");
-        }
+        } 
     } catch (e) {
         logMessage(`Chyba při kontrole (runCheck): ${e.message}`, "ERROR");
     }
@@ -79,30 +86,27 @@ async function runCheck(strat) {
 async function getMarketAverage(pair, settings) {
     let minutesHistory = 1440 * 3; // Default 3 dny
 
-    // A) Podle posledního nákupu
     if (settings && settings.averageCalculation === 'last_buy') {
         const lastTradeDate = getLastTradeDate(pair);
         if (lastTradeDate) {
             const diffMs = new Date() - new Date(lastTradeDate);
             minutesHistory = Math.floor(diffMs / 1000 / 60);
-            if (minutesHistory < 60) minutesHistory = 60; // Minimum 1h
+            if (minutesHistory < 60) minutesHistory = 60;
         } else {
             logMessage(`ℹ️ První nákup (žádná historie). Beru průměr za 24h.`, "SYSTEM");
             minutesHistory = 1440;
         }
     } 
-    // B) Fixní interval
     else if (settings && settings.averageCalculation === 'fixed') {
         const val = settings.fixedValue || 3;
         const unit = settings.fixedUnit || 'days';
-        
         if (unit === 'hours') minutesHistory = val * 60;
         if (unit === 'days') minutesHistory = val * 1440;
         if (unit === 'weeks') minutesHistory = val * 10080;
         if (unit === 'months') minutesHistory = val * 43200;
     }
 
-    // ZÁSADNÍ ZMĚNA: Používáme 'transactions' (tržní data), ne 'tradingHistory' (moje data)
+    // Používáme 'transactions' (tržní data)
     const data = await coinmateApiCall('transactions', { currencyPair: pair, minutesIntoHistory: minutesHistory });
     
     if (Array.isArray(data) && data.length > 0) {
@@ -111,7 +115,7 @@ async function getMarketAverage(pair, settings) {
         return sum / data.length;
     } 
     
-    // FALLBACK (Pojistka dle Clauda): Pokud API selže nebo vrátí prázdno, zkusíme Ticker
+    // Fallback na Ticker
     logMessage(`⚠️ Historie trhu je prázdná, zkouším náhradní řešení (Ticker)...`, "warn");
     const ticker = await coinmateApiCall('ticker', { currencyPair: pair });
     if (ticker && ticker.last) {
@@ -141,12 +145,23 @@ async function placeOrder(strat, price, type, referenceMarketPrice) {
         return;
     }
 
+    // --- CHYTRÉ ZAOKROUHLOVÁNÍ ---
+    // Načteme nastavení pro konkrétní pár, nebo použijeme default
+    const rounding = PAIR_SETTINGS[strat.pair] || { price: 2, amount: 4 };
 
-	// FIX: Oříznutí na 8 desetinných míst (Coinmate limit pro BTC)
-	// Použijeme toFixed(8), který vrátí string, což API v pohodě bere
-    const amountCrypto = (amountFiat / price).toFixed(8);
-	    
-    const res = await coinmateApiCall('buyLimit', { amount: amountCrypto, price: price, currencyPair: strat.pair });
+    // 1. Množství (Amount)
+    const amountCrypto = (amountFiat / price).toFixed(rounding.amount);
+
+    // 2. Cena (Price) - pro limitku
+    const cleanPrice = Number(price).toFixed(rounding.price);
+    
+    logMessage(`⏳ Zadávám limitku: Množství=${amountCrypto}, Cena=${cleanPrice} (Pravidlo: Price ${rounding.price} dec, Amount ${rounding.amount} dec)`, "DEBUG");
+
+    const res = await coinmateApiCall('buyLimit', { 
+        amount: amountCrypto, 
+        price: cleanPrice, 
+        currencyPair: strat.pair 
+    });
     
     if (res && res.success) {
         let savings = 0;
@@ -157,7 +172,7 @@ async function placeOrder(strat, price, type, referenceMarketPrice) {
         if (type === "market") {
              recordTransaction(strat, amountFiat, 0); 
         } else {
-            logMessage(`✅ Limitka za ${price}. Teoretická úspora: ${Math.round(savings)} CZK`, "TRADE");
+            logMessage(`✅ Limitka za ${cleanPrice}. Teoretická úspora: ${Math.round(savings)} CZK`, "TRADE");
             recordTransaction(strat, amountFiat, savings); 
         }
     } else {
@@ -170,7 +185,7 @@ function recordTransaction(strat, fiat, savings) {
         date: new Date().toISOString(),
         pair: strat.pair,
         amountFiat: fiat,
-        amountCrypto: fiat / (strat.pair.includes('EUR') ? 25000 : 1000000), 
+        amountCrypto: fiat / (strat.pair.includes('EUR') ? 25000 : 1000000), // Orientační
         savings: Number(savings.toFixed(2))
     };
     
