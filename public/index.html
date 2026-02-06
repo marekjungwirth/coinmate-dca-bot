@@ -116,9 +116,15 @@
                         <input type="radio" name="avgMode" id="modeLast" value="last_buy" onchange="toggleSettingsUI()">
                         <span>Od posledního nákupu</span>
                     </div>
+                
                     <div class="radio-item" onclick="document.getElementById('modeFixed').click()">
                         <input type="radio" name="avgMode" id="modeFixed" value="fixed" onchange="toggleSettingsUI()">
-                        <span>Vlastní interval</span>
+                        <span>Průměr za X dní</span>
+                    </div>
+                
+                    <div class="radio-item" onclick="document.getElementById('modeCurrent').click()">
+                        <input type="radio" name="avgMode" id="modeCurrent" value="current_price" onchange="toggleSettingsUI()">
+                        <span>Od aktuální ceny (DIP teď)</span>
                     </div>
                 </div>
             </div>
@@ -197,9 +203,11 @@
             // Načtení nastavení průměrování
             const set = data.settings || {};
             if (set.averageCalculation === 'last_buy') {
-                document.getElementById('modeLast').checked = true;
+                       document.getElementById('modeLast').checked = true;
+            } else if (set.averageCalculation === 'current_price') {
+                document.getElementById('modeCurrent').checked = true; // NOVÉ
             } else {
-                document.getElementById('modeFixed').checked = true;
+               document.getElementById('modeFixed').checked = true;
             }
             
             document.getElementById('fixedValue').value = set.fixedValue || 3;
@@ -256,6 +264,8 @@
 
     function toggleSettingsUI() {
         const isLastBuy = document.getElementById('modeLast').checked;
+        const isCurrent = document.getElementById('modeCurrent').checked; // NOVÉ
+        
         const inputVal = document.getElementById('fixedValue');
         const inputUnit = document.getElementById('fixedUnit');
         const helpText = document.getElementById('helpText');
@@ -264,6 +274,10 @@
             inputVal.disabled = true;
             inputUnit.disabled = true;
             helpText.innerText = "Bot zjistí datum tvého posledního nákupu dané mince a spočítá průměrnou cenu přesně od té chvíle do teď.";
+        } else if (isCurrent) { // NOVÉ
+            inputVal.disabled = true;
+            inputUnit.disabled = true;
+            helpText.innerText = "Bot vezme aktuální cenu na burze v momentě nákupu a odečte od ní nastavené % DIPu. (Tvoří okamžitou limitku pod cenou).";
         } else {
             inputVal.disabled = false;
             inputUnit.disabled = false;
@@ -320,7 +334,12 @@
     
     async function saveConfig() {
         const api = { clientId: document.getElementById('clientId').value, publicKey: document.getElementById('publicKey').value, privateKey: document.getElementById('privateKey').value };
-        const averageCalculation = document.getElementById('modeLast').checked ? 'last_buy' : 'fixed';
+        
+        // NOVÁ LOGIKA UKLÁDÁNÍ
+        let averageCalculation = 'fixed';
+        if (document.getElementById('modeLast').checked) averageCalculation = 'last_buy';
+        if (document.getElementById('modeCurrent').checked) averageCalculation = 'current_price';
+        
         const fixedValue = Number(document.getElementById('fixedValue').value) || 3;
         const fixedUnit = document.getElementById('fixedUnit').value;
 
@@ -333,7 +352,7 @@
                 settings: { averageCalculation, fixedValue, fixedUnit }
             }) 
         });
-        alert('Uloženo!');
+        alert('Uloženo! Bot použije nové nastavení při příštím cyklu.');
     }
     async function restartBot() { await fetch('/api/restart', { method: 'POST' }); alert("Bot se restartuje..."); }
     
