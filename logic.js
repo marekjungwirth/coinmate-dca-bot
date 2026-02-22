@@ -1,8 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { coinmateApiCall, logMessage, getHistory } = require('./helpers');
-
-const TRANSACTIONS_PATH = path.join(__dirname, 'data', 'transactions.json');
+const { coinmateApiCall, logMessage, getHistory, addToHistory } = require('./helpers');
 
 // ⚙️ NASTAVENÍ PŘESNOSTI PRO JEDNOTLIVÉ PÁRY
 // Pokud tu pár není, použije se default (Price: 2, Amount: 4)
@@ -162,7 +160,15 @@ async function placeOrder(strat, price, type, referenceMarketPrice) {
         if (isSuccess) {
             const orderId = res.success ? res.data : res;
             logMessage(`✅ [${strat.pair}] Market nákup (Autofallout) dokončen (ID ${orderId}).`, "TRADE");
-            recordTransaction(strat, amountFiat, 0); 
+            addToHistory({
+                date: new Date().toISOString(),
+                pair: strat.pair,
+                amountFiat: Number(amountFiat),
+                amountCrypto: 0, // U autofallout neznáme přesně amountCrypto
+                savings: 0,
+                type: 'market_autofallout',
+                orderId: orderId
+            });
         } else {
              logMessage(`❌ [${strat.pair}] Chyba Market nákupu: ${JSON.stringify(res)}`, "ERROR");
         }
@@ -198,31 +204,27 @@ async function placeOrder(strat, price, type, referenceMarketPrice) {
 
         const orderId = res.success ? res.data : res; // Získáme ID
 
+        const tradeData = {
+            date: new Date().toISOString(),
+            pair: strat.pair,
+            amountFiat: Number(amountFiat),
+            amountCrypto: Number(amountCrypto),
+            savings: Number(savings.toFixed(2)),
+            type: type,
+            price: Number(cleanPrice),
+            orderId: orderId
+        };
+
         if (type === "market") {
              logMessage(`✅ [${strat.pair}] Okamžitý nákup (Limitka za market cenu) ID ${orderId}.`, "TRADE");
-             recordTransaction(strat, amountFiat, 0); 
+             addToHistory(tradeData);
         } else {
             logMessage(`✅ [${strat.pair}] Limitka za ${cleanPrice} zadána (ID ${orderId}). Teoretická úspora: ${Math.round(savings)} CZK`, "TRADE");
-            recordTransaction(strat, amountFiat, savings); 
+            addToHistory(tradeData);
         }
     } else {
         logMessage(`❌ [${strat.pair}] Chyba při zadávání Limitky: ${JSON.stringify(res)}`, "ERROR");
     }
-}
-
-function recordTransaction(strat, fiat, savings) {
-    const tx = {
-        date: new Date().toISOString(),
-        pair: strat.pair,
-        amountFiat: fiat,
-        amountCrypto: fiat / (strat.pair.includes('EUR') ? 25000 : 1000000), // Orientační, jen pro záznam
-        savings: Number(savings.toFixed(2))
-    };
-    
-    let history = [];
-    if (fs.existsSync(TRANSACTIONS_PATH)) history = JSON.parse(fs.readFileSync(TRANSACTIONS_PATH));
-    history.push(tx);
-    fs.writeFileSync(TRANSACTIONS_PATH, JSON.stringify(history, null, 2));
 }
 
 module.exports = { runBuy, runCheck };
