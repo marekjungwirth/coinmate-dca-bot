@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { coinmateApiCall, logMessage, getHistory, addToHistory } = require('./helpers');
+const { coinmateApiCall, logMessage, getHistory, addToHistory, getCurrentPrices } = require('./helpers');
 
 // ⚙️ NASTAVENÍ PŘESNOSTI PRO JEDNOTLIVÉ PÁRY
 // Pokud tu pár není, použije se default (Price: 2, Amount: 4)
@@ -160,14 +160,32 @@ async function placeOrder(strat, price, type, referenceMarketPrice) {
         if (isSuccess) {
             const orderId = res.success ? res.data : res;
             logMessage(`✅ [${strat.pair}] Market nákup (Autofallout) dokončen (ID ${orderId}).`, "TRADE");
+
+            // Zjistíme cenu z CoinGecko pro přesnější výpočet amountCrypto
+            let executionPrice = 0;
+            let estimatedCrypto = 0;
+
+            try {
+                const prices = await getCurrentPrices([strat.coinGeckoId], strat.fiat);
+                if (prices && prices[strat.coinGeckoId]) {
+                    executionPrice = prices[strat.coinGeckoId][strat.fiat.toLowerCase()];
+                    if (executionPrice > 0) {
+                        estimatedCrypto = amountFiat / executionPrice;
+                    }
+                }
+            } catch (e) {
+                logMessage(`Chyba při stahování ceny z CoinGecko: ${e.message}`, "WARN");
+            }
+
             addToHistory({
                 date: new Date().toISOString(),
                 pair: strat.pair,
                 amountFiat: Number(amountFiat),
-                amountCrypto: 0, // U autofallout neznáme přesně amountCrypto
-                savings: 0,
+                amountCrypto: Number(estimatedCrypto),
+                savings: 0, // U autofallout (panic buy) zpravidla žádná úspora není
                 type: 'market_autofallout',
-                orderId: orderId
+                orderId: orderId,
+                price: Number(executionPrice)
             });
         } else {
              logMessage(`❌ [${strat.pair}] Chyba Market nákupu: ${JSON.stringify(res)}`, "ERROR");
