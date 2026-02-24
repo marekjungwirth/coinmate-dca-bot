@@ -129,10 +129,21 @@ app.get('/api/logs', (req, res) => {
 
 // Upravit endpoint /api/stats v server.js
 
-app.get('/api/stats', (req, res) => {
+app.get('/api/stats', async (req, res) => {
     const range = req.query.range || 'all';
+    const targetCurrency = (req.query.currency || 'czk').toUpperCase(); // CZK or EUR
+
     const history = getHistory();
     if (history.length === 0) return res.json({ labels: [], datasets: [] });
+
+    // Zjistit kurz EUR/CZK pro převody
+    let eurRate = 25;
+    try {
+        const ticker = await coinmateApiCall('ticker', { currencyPair: 'EUR_CZK' });
+        if (ticker && ticker.last) eurRate = Number(ticker.last);
+    } catch (e) {
+        console.error("Failed to fetch EUR_CZK rate, using 25");
+    }
 
     // Seřadit historii
     const sortedHistory = [...history].sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -154,16 +165,29 @@ app.get('/api/stats', (req, res) => {
     const datasets = coins.map(coin => {
         let runningTotal = 0;
         
+        const getTradeValue = (t) => {
+            // Rozhodnout, zda konvertovat
+            const isEurTrade = t.pair.endsWith('_EUR');
+            const amount = Number(t.amountFiat);
+
+            if (targetCurrency === 'CZK') {
+                return isEurTrade ? amount * eurRate : amount;
+            } else {
+                // Target EUR
+                return isEurTrade ? amount : amount / eurRate;
+            }
+        };
+
         // Vypočítat počáteční stav před cutoff (aby graf nezačínal od nuly, pokud už jsi nakupoval dřív)
         sortedHistory
             .filter(t => t.pair.startsWith(coin) && new Date(t.date) < cutoff)
-            .forEach(t => runningTotal += Number(t.amountCrypto));
+            .forEach(t => runningTotal += getTradeValue(t));
 
         const data = labels.map(date => {
-            // Přičíst nákupy v daný den
+            // Přičíst nákupy v daný den (Investované FIAT)
             sortedHistory
                 .filter(t => t.date.startsWith(date) && t.pair.startsWith(coin))
-                .forEach(t => runningTotal += Number(t.amountCrypto));
+                .forEach(t => runningTotal += getTradeValue(t));
             return runningTotal;
         });
 

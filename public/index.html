@@ -239,11 +239,13 @@
         document.getElementById(`curr-czk`).classList.remove('active');
         document.getElementById(`curr-eur`).classList.remove('active');
         document.getElementById(`curr-${curr}`).classList.add('active');
-        loadPortfolio(); 
+        loadPortfolio();
+        loadChartData('all'); // Aktualizace grafu při změně měny
     }
 
     function loadChartData(range) {
-        fetch(`/api/stats?range=${range}`)
+        // Přidán parametr currency do volání API
+        fetch(`/api/stats?range=${range}&currency=${selectedCurrency}`)
             .then(res => res.json())
             .then(data => {
                 const ctx = document.getElementById('portfolioChart').getContext('2d');
@@ -255,7 +257,32 @@
                         responsive: true, 
                         maintainAspectRatio: false,
                         interaction: { mode: 'index', intersect: false },
-                        scales: { y: { beginAtZero: false } }
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: selectedCurrency.toUpperCase() }).format(context.parsed.y);
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: `Investováno (${selectedCurrency.toUpperCase()})`
+                                },
+                                stacked: true // Stacked area chart pro zobrazení celkové investice
+                            }
+                        }
                     }
                 });
             })
