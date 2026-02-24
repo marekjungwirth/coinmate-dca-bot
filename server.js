@@ -71,24 +71,30 @@ function startBot() {
     checkRule.hour = (strat.runHour === 0) ? 23 : strat.runHour - 1; 
     checkRule.minute = 55;
 
+    const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    let freqText = '';
+
     if (strat.frequency === 'weekly') {
         buyRule.dayOfWeek = strat.runDay;
+        freqText = `Weekly (${DAY_NAMES[strat.runDay]})`;
         // Kontrola proběhne těsně před dalším týdenním nákupem
         checkRule.dayOfWeek = strat.runDay; 
     } else if (strat.frequency === 'monthly') {
         buyRule.date = strat.runDay;
+        freqText = `Monthly (Day ${strat.runDay})`;
         // Kontrola proběhne těsně před dalším měsíčním nákupem
         checkRule.date = strat.runDay;
     } else {
         // Daily: Obě pravidla běží každý den
         buyRule.dayOfWeek = new schedule.Range(0, 6);
         checkRule.dayOfWeek = new schedule.Range(0, 6);
+        freqText = `Daily`;
     }
 
     scheduledJobs.push(schedule.scheduleJob(buyRule, () => runBuy(activeStrat)));
     scheduledJobs.push(schedule.scheduleJob(checkRule, () => runCheck(activeStrat)));
     
-    logMessage(`✅ Scheduled: ${strat.pair} (Buy at ${strat.runHour}:00, Check at ${checkRule.hour}:55)`, "SYSTEM");
+    logMessage(`✅ Scheduled: ${strat.pair} (${freqText} at ${strat.runHour}:00, Check at ${checkRule.hour}:55)`, "SYSTEM");
   });
   return true;
 }
