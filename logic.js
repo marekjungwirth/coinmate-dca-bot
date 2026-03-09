@@ -73,15 +73,26 @@ async function runCheck(strat) {
     
     try {
         const openOrders = await coinmateApiCall('openOrders', { currencyPair: strat.pair });
+        let deletedBotOrders = 0;
         
         // Bezpečná kontrola pole
         if (Array.isArray(openOrders) && openOrders.length > 0) {
             for (const order of openOrders) {
-                await coinmateApiCall('cancelOrder', { orderId: order.id });
-                logMessage(`❌ Ruším starou limitku ID ${order.id} (${strat.pair}).`, "SYSTEM");
+                // Zkontrolujeme, zda objednávka patří našemu botovi
+                if (order.clientOrderId && order.clientOrderId.startsWith('DCABOT_')) {
+                    await coinmateApiCall('cancelOrder', { orderId: order.id });
+                    logMessage(`❌ Ruším starou bot limitku ID ${order.id} (${strat.pair}).`, "SYSTEM");
+                    deletedBotOrders++;
+                } else {
+                    // Ignorujeme objednávky z jiných platforem (např. Štosuj) nebo ruční
+                    logMessage(`⏭️ Ignoruji cizí limitku ID ${order.id} (Client ID: ${order.clientOrderId || 'N/A'})`, "SYSTEM");
+                }
             }
-            // Koupit marketem (Autofallout)
-            await placeOrder(strat, 0, "market_autofallout");
+            
+            // Koupit marketem (Autofallout) JEN POKUD JSME NĚJAKOU NAŠI LIMITKU ZRUŠILI
+            if (deletedBotOrders > 0) {
+                await placeOrder(strat, 0, "market_autofallout");
+            }
         } 
     } catch (e) {
         logMessage(`Chyba při kontrole (runCheck - ${strat.pair}): ${e.message}`, "ERROR");
@@ -95,7 +106,6 @@ async function getMarketAverage(pair, settings) {
 
     // --- MOŽNOST C: DIP OD AKTUÁLNÍ CENY ---
     if (settings && settings.averageCalculation === 'current_price') {
-        // logMessage(`ℹ️ Strategie: Dip od aktuální ceny (Current Price).`, "SYSTEM");
         const ticker = await coinmateApiCall('ticker', { currencyPair: pair });
         if (ticker && ticker.last) return Number(ticker.last);
         return null;
@@ -152,16 +162,18 @@ async function placeOrder(strat, price, type, referenceMarketPrice) {
     
     // 1. SCÉNÁŘ: MARKET AUTOFALLOUT (při rušení limitky)
     if (type === "market_autofallout") {
-        const res = await coinmateApiCall('buyInstant', { total: amountFiat, currencyPair: strat.pair });
+        // Použijeme jedinečný identifikátor i pro market nákupy (ikdyž u Instant buy to API mozná ignoruje, pro jistotu to zkusíme přidat, pokud by to v budoucnu podporovali)
+        const res = await coinmateApiCall('buyInstant', { 
+            total: amountFiat, 
+            currencyPair: strat.pair
+        });
         
-        // FIX: Kontrola úspěchu i pro číslo (ID)
         const isSuccess = (res && res.success) || (res && !isNaN(res));
 
         if (isSuccess) {
             const orderId = res.success ? res.data : res;
             logMessage(`✅ [${strat.pair}] Market nákup (Autofallout) dokončen (ID ${orderId}).`, "TRADE");
 
-            // Zjistíme cenu z CoinGecko pro přesnější výpočet amountCrypto
             let executionPrice = 0;
             let estimatedCrypto = 0;
 
@@ -182,7 +194,7 @@ async function placeOrder(strat, price, type, referenceMarketPrice) {
                 pair: strat.pair,
                 amountFiat: Number(amountFiat),
                 amountCrypto: Number(estimatedCrypto),
-                savings: 0, // U autofallout (panic buy) zpravidla žádná úspora není
+                savings: 0,
                 type: 'market_autofallout',
                 orderId: orderId,
                 price: Number(executionPrice)
@@ -194,24 +206,20 @@ async function placeOrder(strat, price, type, referenceMarketPrice) {
     }
 
     // 2. SCÉNÁŘ: LIMITKA NEBO SMART MARKET
-    // --- CHYTRÉ ZAOKROUHLOVÁNÍ ---
     const rounding = PAIR_SETTINGS[strat.pair] || { price: 2, amount: 4 };
-
-    // Množství (Amount)
     const amountCrypto = (amountFiat / price).toFixed(rounding.amount);
-
-    // Cena (Price) - pro limitku
     const cleanPrice = Number(price).toFixed(rounding.price);
     
-    // logMessage(`⏳ Zadávám limitku: Množství=${amountCrypto}, Cena=${cleanPrice} (Pravidlo: Price ${rounding.price} dec, Amount ${rounding.amount} dec)`, "DEBUG");
+    // Vytvoříme unikátní ID pro bota (např. DCABOT_1710000000)
+    const uniqueClientId = 'DCABOT_' + Date.now();
 
     const res = await coinmateApiCall('buyLimit', { 
         amount: amountCrypto, 
         price: cleanPrice, 
-        currencyPair: strat.pair 
+        currencyPair: strat.pair,
+        clientOrderId: uniqueClientId // TÍMTO SE BOT PODEPIŠE
     });
     
-    // FIX: Coinmate vrací ID objednávky jako číslo při úspěchu -> považujeme za success
     const isSuccess = (res && res.success) || (res && !isNaN(res)); 
 
     if (isSuccess) {
@@ -220,7 +228,7 @@ async function placeOrder(strat, price, type, referenceMarketPrice) {
             savings = amountFiat * ((referenceMarketPrice / price) - 1);
         }
 
-        const orderId = res.success ? res.data : res; // Získáme ID
+        const orderId = res.success ? res.data : res;
 
         const tradeData = {
             date: new Date().toISOString(),
@@ -230,7 +238,8 @@ async function placeOrder(strat, price, type, referenceMarketPrice) {
             savings: Number(savings.toFixed(2)),
             type: type,
             price: Number(cleanPrice),
-            orderId: orderId
+            orderId: orderId,
+            clientOrderId: uniqueClientId // Uložíme i do naší historie
         };
 
         if (type === "market") {
