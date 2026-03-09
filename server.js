@@ -129,33 +129,41 @@ app.get('/api/logs', (req, res) => {
 
 // Upravit endpoint /api/stats v server.js
 
+async function getEurRate() {
+    let eurRate = 25.3; // Fallback
+    try {
+        const [tickerCzk, tickerEur] = await Promise.all([
+            coinmateApiCall('ticker', { currencyPair: 'BTC_CZK' }),
+            coinmateApiCall('ticker', { currencyPair: 'BTC_EUR' })
+        ]);
+
+        if (tickerCzk && tickerCzk.last && tickerEur && tickerEur.last) {
+            eurRate = Number(tickerCzk.last) / Number(tickerEur.last);
+        }
+    } catch (e) {
+        console.error("Nepodařilo se získat křížový kurz, používám fallback 25.3");
+    }
+    return eurRate;
+}
+
 app.get('/api/stats', async (req, res) => {
     const range = req.query.range || 'all';
-    const targetCurrency = (req.query.currency || 'czk').toUpperCase(); // CZK or EUR
+    const targetCurrency = (req.query.currency || 'czk').toUpperCase();
 
     const history = getHistory();
     if (history.length === 0) return res.json({ labels: [], datasets: [] });
 
-    // Zjistit kurz EUR/CZK pro převody
-    let eurRate = 25;
-    try {
-        const ticker = await coinmateApiCall('ticker', { currencyPair: 'EUR_CZK' });
-        if (ticker && ticker.last) eurRate = Number(ticker.last);
-    } catch (e) {
-        console.error("Failed to fetch EUR_CZK rate, using 25");
-    }
+    // Zjistit kurz EUR/CZK přes BTC křížový kurz
+    const eurRate = await getEurRate();
 
-    // Seřadit historii
     const sortedHistory = [...history].sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    // Časový filtr
     const now = new Date();
     let cutoff = new Date(0);
     if (range === '7d') cutoff = new Date(now.setDate(now.getDate() - 7));
     else if (range === '30d') cutoff = new Date(now.setDate(now.getDate() - 30));
     else if (range === '1y') cutoff = new Date(now.setFullYear(now.getFullYear() - 1));
 
-    // Vygenerovat unikátní dny pro osu X (jen od cutoff)
     const labels = [...new Set(sortedHistory
         .filter(t => new Date(t.date) >= cutoff)
         .map(t => t.date.split('T')[0]))];
@@ -166,25 +174,21 @@ app.get('/api/stats', async (req, res) => {
         let runningTotal = 0;
         
         const getTradeValue = (t) => {
-            // Rozhodnout, zda konvertovat
             const isEurTrade = t.pair.endsWith('_EUR');
             const amount = Number(t.amountFiat);
 
             if (targetCurrency === 'CZK') {
                 return isEurTrade ? amount * eurRate : amount;
             } else {
-                // Target EUR
                 return isEurTrade ? amount : amount / eurRate;
             }
         };
 
-        // Vypočítat počáteční stav před cutoff (aby graf nezačínal od nuly, pokud už jsi nakupoval dřív)
         sortedHistory
             .filter(t => t.pair.startsWith(coin) && new Date(t.date) < cutoff)
             .forEach(t => runningTotal += getTradeValue(t));
 
         const data = labels.map(date => {
-            // Přičíst nákupy v daný den (Investované FIAT)
             sortedHistory
                 .filter(t => t.date.startsWith(date) && t.pair.startsWith(coin))
                 .forEach(t => runningTotal += getTradeValue(t));
@@ -197,7 +201,7 @@ app.get('/api/stats', async (req, res) => {
             backgroundColor: COIN_COLORS[coin] || '#888', 
             borderColor: COIN_COLORS[coin], 
             fill: true, 
-            tension: 0.2 // Méně agresivní křivka pro "ostřejší" schody nákupů
+            tension: 0.2 
         };
     });
     res.json({ labels, datasets });
@@ -206,24 +210,51 @@ app.get('/api/stats', async (req, res) => {
 app.get('/api/portfolio', async (req, res) => {
     const target = (req.query.currency || 'czk').toLowerCase(); 
     const history = getHistory();
+    const eurRate = await getEurRate();
+
     let botStats = { invested: 0, saved: 0, tradeCount: history.length };
-    history.forEach(t => { botStats.invested += Number(t.amountFiat); botStats.saved += Number(t.savings || 0); });
+    
+    history.forEach(t => { 
+        const isEurTrade = t.pair.endsWith('_EUR');
+        const amount = Number(t.amountFiat);
+        const saved = Number(t.savings || 0);
+
+        if (target === 'czk') {
+            botStats.invested += isEurTrade ? amount * eurRate : amount;
+            botStats.saved += isEurTrade ? saved * eurRate : saved;
+        } else { // target EUR
+            botStats.invested += isEurTrade ? amount : amount / eurRate;
+            botStats.saved += isEurTrade ? saved : saved / eurRate;
+        }
+    });
 
     const balances = await coinmateApiCall('balances');
     let totalValue = 0;
+    
     if (balances) {
         let ids = []; let symToId = {};
         for (const [sym, d] of Object.entries(balances)) {
             const amt = Number(d.balance);
             if (amt > 0) {
-                if (COIN_MAPPING[sym]) { ids.push(COIN_MAPPING[sym]); symToId[COIN_MAPPING[sym]] = sym; }
-                else if (sym === 'CZK' && target === 'czk') totalValue += amt;
-                else if (sym === 'EUR' && target === 'eur') totalValue += amt;
+                if (COIN_MAPPING[sym]) { 
+                    ids.push(COIN_MAPPING[sym]); 
+                    symToId[COIN_MAPPING[sym]] = sym; 
+                }
+                else if (sym === 'CZK') {
+                    totalValue += target === 'czk' ? amt : amt / eurRate;
+                }
+                else if (sym === 'EUR') {
+                    totalValue += target === 'eur' ? amt : amt * eurRate;
+                }
             }
         }
         if (ids.length > 0) {
             const prices = await getCurrentPrices(ids, target);
-            for (const [id, p] of Object.entries(prices)) totalValue += (Number(balances[symToId[id]].balance) * p[target]);
+            for (const [id, p] of Object.entries(prices)) {
+                 // Ujistíme se, že máme cenu pro cílovou měnu
+                 const priceInTarget = p[target] || 0;
+                 totalValue += (Number(balances[symToId[id]].balance) * priceInTarget);
+            }
         }
     }
     res.json({ botStats, totalValue, currency: target.toUpperCase() });
