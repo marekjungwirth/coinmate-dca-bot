@@ -322,7 +322,7 @@
             card.style.setProperty('--strat-color', COIN_COLORS[coin] || '#888');
             
             let timeFields = '';
-            const timeHint = `<div class="form-text">Pozn: Čas 14 = 14:00. Bot nakoupí v tuto hodinu a bude čekat na Dip téměř 24h.</div>`;
+            const timeHint = `<div class="form-text">Pozn: Čas 14 = 14:00. Bot v tuto hodinu zkontroluje podmínky a následně bude čekat na Dip až do začátku dalšího naplánovaného cyklu.</div>`;
 
             if(strat.frequency === 'daily') {
                 timeFields = `<label>Hodina (0-23)</label><input type="number" value="${strat.runHour}" onchange="strategies[${index}].runHour=Number(this.value)">${timeHint}`;
