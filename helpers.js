@@ -73,7 +73,9 @@ async function coinmateApiCall(endpoint, params = {}) {
       const url = `https://coinmate.io/api/${endpoint}?${queryParams}`;
       
       try {
-          const res = await fetch(url);
+          const res = await fetch(url, {
+              headers: { 'User-Agent': 'bot/coinmate-dca-bot (v1.2.3)' }
+          });
           const textRes = await res.text();
           let json;
           try { json = JSON.parse(textRes); } catch(e) { return null; }
@@ -114,7 +116,10 @@ async function coinmateApiCall(endpoint, params = {}) {
   try {
     const res = await fetch(`https://coinmate.io/api/${endpoint}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { 
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'bot/coinmate-dca-bot (v1.2.3)'
+      },
       body: bodyParams.toString()
     });
 
